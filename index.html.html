@@ -1,0 +1,2918 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<script>
+/* =====================================================================
+   CONFIGURATION R&D PILOT  (seul bloc à modifier)
+   Aucune de ces valeurs n'est un secret : elles identifient l'application
+   et l'emplacement du fichier. L'accès réel est contrôlé par Microsoft
+   (connexion K-Motors) et par les droits SharePoint du fichier.
+   ===================================================================== */
+const RDP_CONFIG = {
+  // Entra ID > Inscriptions d'applications > RD Pilot > Vue d'ensemble
+  TENANT_ID: 'A_REMPLIR',            // « ID de l'annuaire (locataire) »
+  CLIENT_ID: 'A_REMPLIR',            // « ID d'application (client) »
+
+  // Adresse de cette page. Laisser vide = détection automatique.
+  // Si renseignée, doit être identique à l'URI de redirection déclarée dans Entra ID.
+  REDIRECT_URI: 'https://clarissedec.github.io/gantt-KM-staff/',
+
+  // Emplacement du fichier JSON sur SharePoint. Deux possibilités :
+  // 1) DRIVE_ID + ITEM_ID (prioritaires si les deux sont remplis), fournis par Claude ;
+  // 2) FILE_URL : lien du fichier copié dans SharePoint avec l'option
+  //    « Personnes disposant d'un accès existant ».
+  DRIVE_ID: 'b!FkXFgi07aE-UIaXqEwACpquOTYYmzAlOvKrZJaVIUhQ6qz18s33qRLVNn2q_ZCSP',
+  ITEM_ID: '01QYEUXG3IA2EHC4KSHNALN6GRV6U2U7SE',
+  FILE_URL: 'A_REMPLIR',
+
+  // Permissions Microsoft Graph demandées (déléguées).
+  SCOPES: ['User.Read', 'Files.ReadWrite.All'],
+
+  // Vérification des modifications faites par les autres (en secondes).
+  REFRESH_SECONDS: 60,
+
+  // true = sur téléphone, le Gantt est toujours en lecture seule.
+  MOBILE_READ_ONLY: true,
+  MOBILE_MAX_WIDTH: 820,
+
+  // true = la dernière version consultée reste disponible hors ligne (lecture seule).
+  KEEP_OFFLINE_CACHE: true,
+
+  // Personne à contacter, affichée dans les messages d'erreur.
+  SUPPORT_CONTACT: 'Clarisse',
+
+  // Préfixe des fichiers JSON téléchargés (export de secours, copies en cas de conflit).
+  FILE_PREFIX: 'RD_Pilot'
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@4.30.0/lib/msal-browser.min.js" integrity="sha384-RGxxfG5yRS8DLU7ZJ8OoLhbV/BsJFHyPuMVHrTLbpj3t5Z15LnviJmaznKY/a7LZ" crossorigin="anonymous"></script>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>[hidden]:not([hidden=until-found i]){display:none!important}</style>
+</head>
+<body>
+
+  <meta name="description" content="Planification Gantt autonome des programmes R&D multidisciplinaires">
+  <meta name="application-name" content="R&D Pilot autonome">
+  <title>R&D Pilot Planning</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b1020'/%3E%3Cpath d='M7 22V10h4v8h4V7h4v11h6v4z' fill='%234fe0b5'/%3E%3C/svg%3E">
+  <style>
+:root{--bg:#f3f5f8;--ink:#172033;--muted:#6d7688;--line:#dfe4eb;--nav:#0d1323;--nav2:#171f33;--accent:#18b98b;--blue:#5277e8;--amber:#e5a43b;--red:#e66a72;--purple:#8a6be8;--task-col:360px;--day:16px;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink)}*{box-sizing:border-box}body{margin:0;background:var(--bg);font-size:14px}.app-shell{min-height:100vh;display:grid;grid-template-columns:240px 1fr}.sidebar{background:var(--nav);color:#eaf0ff;padding:22px 16px;display:flex;flex-direction:column;position:sticky;top:0;height:100vh}.brand{display:flex;gap:11px;align-items:center;font-weight:750;font-size:18px;margin:0 8px 30px}.mark{width:30px;height:30px;border-radius:8px;background:var(--accent);color:#09271f;display:grid;place-items:center;font-weight:900}.sidebar nav{display:grid;gap:5px}.nav-item,.project-card,.reset{border:0;background:transparent;color:#aeb9ce;text-align:left;border-radius:8px;padding:10px 12px;font:inherit;cursor:pointer}.nav-item{display:flex;gap:12px;align-items:center;width:100%}.nav-item.active,.nav-item:hover{background:var(--nav2);color:white}.side-section{margin-top:30px}.eyebrow{font-size:11px;letter-spacing:.1em;color:#8b95a8;font-weight:800;margin:0 0 8px}.project-card{display:flex;gap:10px;align-items:center;background:#121a2c;width:100%;color:white}.project-card small{display:block;color:#7f8ba2;margin-top:3px}.project-dot{width:9px;height:9px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 4px #18b98b25}.team-mini{margin-top:auto;padding:18px 8px;border-top:1px solid #222c42}.mini-row{display:flex;align-items:center;gap:9px;margin:10px 0;color:#bac4d7}.avatar{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:800;color:white}.mini-row small{margin-left:auto;color:#6f7b92}.reset{font-size:12px;padding-left:8px}.reset:hover{color:white}main{min-width:0;padding:0 28px 38px}.topbar{height:92px;display:flex;align-items:center;justify-content:space-between}.breadcrumb{font-size:12px;color:var(--muted);margin-bottom:5px}.topbar h1{font-size:22px;margin:0}.header-actions{display:flex;gap:9px}.btn{border:1px solid var(--line);border-radius:8px;padding:9px 13px;background:white;color:var(--ink);font-weight:650;cursor:pointer}.btn:hover{filter:brightness(.98)}.btn.primary{background:var(--accent);border-color:var(--accent);color:#07281f}.btn.ghost{background:white}.btn.danger{color:#c63c4a;border-color:#f1c9cd}.kpis{display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:12px;margin-bottom:15px}.kpi{background:white;border:1px solid var(--line);border-radius:10px;padding:15px 17px}.kpi-label{color:var(--muted);font-size:12px}.kpi-value{font-size:24px;font-weight:800;margin:5px 0}.kpi-note{font-size:11px;color:var(--muted)}.kpi-note.alert{color:#c35059}.toolbar{display:flex;align-items:center;gap:10px;margin:0 0 12px}.segmented{display:flex;border:1px solid var(--line);background:white;padding:3px;border-radius:8px}.segmented button{border:0;background:transparent;padding:6px 10px;color:var(--muted);border-radius:5px;cursor:pointer}.segmented button.active{background:#e8ecf3;color:var(--ink);font-weight:700}.search{display:flex;align-items:center;background:white;border:1px solid var(--line);border-radius:8px;padding:0 10px;min-width:240px}.search input{border:0;outline:0;padding:8px;width:100%;font:inherit}select,input{font:inherit}toolbar select,.toolbar select,#capacityPeriod{border:1px solid var(--line);background:white;border-radius:8px;padding:8px;color:var(--ink)}.toggle{display:flex;align-items:center;gap:7px;margin-left:auto;color:var(--muted);font-size:12px}.toggle input{display:none}.toggle span{width:32px;height:18px;border-radius:10px;background:#b8c0cd;position:relative}.toggle span:after{content:"";width:12px;height:12px;position:absolute;top:3px;left:3px;border-radius:50%;background:white;transition:.2s}.toggle input:checked+span{background:var(--accent)}.toggle input:checked+span:after{left:17px}.gantt-card{background:white;border:1px solid var(--line);border-radius:10px;overflow:auto;max-height:calc(100vh - 280px)}.gantt-head,.gantt-row{display:grid;grid-template-columns:var(--task-col) minmax(780px,1fr);min-width:1140px}.gantt-head{position:sticky;top:0;background:#f9fafc;z-index:5;border-bottom:1px solid var(--line)}.task-head{position:sticky;left:0;z-index:6;background:#f9fafc;padding:13px 16px;font-weight:750;border-right:1px solid var(--line)}.task-head span{color:var(--muted);font-weight:500}.timeline-head{display:grid;height:45px}.week-label{font-size:11px;color:var(--muted);padding:14px 0 0 7px;border-left:1px solid var(--line)}.task-cell{position:sticky;left:0;z-index:3;background:white;display:grid;grid-template-columns:1fr 70px 34px;align-items:center;min-height:64px;padding:8px 8px 8px 16px;border-right:1px solid var(--line);border-bottom:1px solid #edf0f4;cursor:pointer}.task-cell:hover{background:#f9fafc}.task-title{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.task-meta{display:flex;gap:7px;color:var(--muted);font-size:11px;margin-top:5px}.phase-dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-top:3px}.owner-cell{display:flex;align-items:center;gap:5px;color:var(--muted);font-size:11px}.expand{color:#a2aaba}.timeline-row{position:relative;min-height:64px;border-bottom:1px solid #edf0f4;background-image:linear-gradient(to right,#edf0f4 1px,transparent 1px);background-size:calc(100% / 14) 100%}.today-line{position:absolute;top:0;bottom:0;width:1px;background:#ef5964;z-index:2}.today-line:before{content:"";position:absolute;width:7px;height:7px;border-radius:50%;background:#ef5964;top:0;left:-3px}.bar{position:absolute;height:22px;top:22px;border-radius:5px;min-width:8px;color:#fff;font-size:10px;font-weight:700;padding:4px 7px;white-space:nowrap;overflow:hidden;cursor:pointer;box-shadow:0 2px 6px #17203318}.bar .progress-fill{position:absolute;left:0;top:0;bottom:0;background:#ffffff2c}.bar em{position:relative;font-style:normal}.bar.Research{background:var(--blue)}.bar.Prototype{background:var(--accent)}.bar.Testsprototype{background:var(--amber)}.bar.Testsàléchelle{background:var(--purple)}.baseline{position:absolute;height:5px;top:49px;background:#9ba5b6;border-radius:4px;opacity:.7}.milestone{position:absolute;width:15px;height:15px;transform:rotate(45deg);top:25px;background:#fcbe4c;border:2px solid white;box-shadow:0 0 0 1px #c88a20}.dep-line{position:absolute;height:1px;border-top:1px dashed #a7b0c0;top:15px}.legend{display:flex;gap:18px;padding:12px 5px;color:var(--muted);font-size:11px;align-items:center}.legend span{display:flex;gap:6px;align-items:center}.leg{width:9px;height:9px;border-radius:3px}.research{background:var(--blue)}.prototype{background:var(--accent)}.test{background:var(--amber)}.scale{background:var(--purple)}.baseline-line{width:16px;border-top:3px solid #9ba5b6}.diamond{width:9px;height:9px;background:#fcbe4c;transform:rotate(45deg)}.capacity-layout{display:grid;grid-template-columns:minmax(600px,2fr) minmax(280px,1fr);gap:16px}.panel{background:white;border:1px solid var(--line);border-radius:10px;padding:20px}.panel-title{display:flex;justify-content:space-between;align-items:start}.panel h2{font-size:18px;margin:0 0 18px}.capacity-row{display:grid;grid-template-columns:170px 1fr 60px;gap:15px;align-items:center;padding:14px 0;border-bottom:1px solid #edf0f4}.person{display:flex;align-items:center;gap:10px}.person strong,.person small{display:block}.person small{color:var(--muted);font-size:11px;margin-top:3px}.load-track{height:12px;background:#edf0f5;border-radius:7px;overflow:hidden;position:relative}.load-fill{height:100%;border-radius:7px;background:var(--accent)}.load-fill.warn{background:var(--amber)}.load-fill.over{background:var(--red)}.load-num{text-align:right;font-weight:750}.skill-item{margin:0 0 18px}.skill-name{display:flex;justify-content:space-between;margin-bottom:7px;font-weight:650}.skill-name span{font-size:11px;color:var(--muted)}.skill-bar{height:7px;border-radius:4px;background:#edf0f5;overflow:hidden}.skill-bar i{display:block;height:100%;background:var(--blue);border-radius:4px}.risk{color:#c04b56!important}dialog{border:0;border-radius:14px;padding:0;width:min(600px,calc(100vw - 30px));box-shadow:0 20px 60px #07101f55}dialog::backdrop{background:#07101f88}dialog form{padding:23px}.dialog-head{display:flex;justify-content:space-between}.dialog-head h2{margin:0 0 20px;font-size:20px}.icon-btn{border:0;background:transparent;font-size:25px;cursor:pointer;color:var(--muted)}dialog label{display:grid;gap:6px;color:#4c566a;font-size:12px;font-weight:650;margin-bottom:14px}dialog input,dialog select{border:1px solid var(--line);border-radius:7px;padding:9px;color:var(--ink);width:100%}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 13px}.check-row{display:flex!important;align-items:center;gap:8px!important}.check-row input{width:auto}.match-box{background:#f0fbf7;border:1px solid #c7eee2;border-radius:8px;padding:11px 13px;font-size:12px;color:#3e5a52;margin-bottom:16px}.dialog-actions{display:flex;gap:8px;align-items:center}.dialog-actions span{flex:1}.toast{position:fixed;right:24px;bottom:24px;background:#101827;color:white;padding:11px 15px;border-radius:8px;box-shadow:0 8px 30px #07101f38;opacity:0;transform:translateY(10px);pointer-events:none;transition:.2s}.toast.show{opacity:1;transform:none}@media(max-width:900px){.app-shell{grid-template-columns:70px 1fr}.sidebar{padding:18px 10px}.brand span:last-child,.nav-item:not(.active){font-size:0}.nav-item{justify-content:center}.nav-item span{font-size:17px}.side-section,.team-mini,.reset{display:none}main{padding:0 14px}.kpis{grid-template-columns:1fr 1fr}.capacity-layout{grid-template-columns:1fr}.toolbar{flex-wrap:wrap}.toggle{margin-left:0}}@media(max-width:620px){.app-shell{display:block}.sidebar{height:58px;position:static;display:flex;flex-direction:row;padding:8px 12px;align-items:center}.brand{margin:0 auto 0 0}.sidebar nav{display:flex}.topbar{height:auto;padding:18px 0}.header-actions .ghost{display:none}.kpis{grid-template-columns:1fr 1fr}.kpi{padding:11px}.kpi-value{font-size:20px}.search{order:3;width:100%}.gantt-card{max-height:60vh}.capacity-layout{grid-template-columns:1fr}.panel{overflow:auto}}
+.bar.Supply{background:#27334d}.bar.supply-locked{background:repeating-linear-gradient(135deg,#738097,#738097 6px,#8994a7 6px,#8994a7 12px);opacity:.78}.milestone.decision{background:#ef5964;box-shadow:0 0 0 1px #b83d47}.sprint-line{position:absolute;top:0;bottom:0;border-left:1px dashed #58a995;z-index:1}.sprint-line:before{content:"S" attr(data-sprint);position:absolute;top:2px;left:3px;font-size:9px;color:#35856f;font-weight:800}.settings-grid{display:grid;grid-template-columns:1.2fr 1fr;gap:16px}.sprint-settings{grid-column:1/-1}.settings-note{color:var(--muted);font-size:12px;margin:-8px 0 16px}.setting-row{display:grid;grid-template-columns:1.2fr 1fr 85px 32px;gap:8px;padding:10px 0;border-bottom:1px solid #edf0f4}.setting-row input{min-width:0;border:1px solid var(--line);border-radius:7px;padding:8px}.setting-row .icon-btn{font-size:18px}.task-setting{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid #edf0f4}.task-setting input{min-width:0;border:1px solid var(--line);border-radius:7px;padding:8px}.type-badge{font-size:10px;font-weight:800;padding:4px 6px;border-radius:5px;background:#edf0f5;color:var(--muted)}.type-badge.supply{background:#e4e8ef;color:#27334d}.type-badge.decision{background:#ffe7e9;color:#b83d47}.setting-line{display:flex;gap:20px;align-items:end}.setting-line label{display:grid;gap:6px;font-size:12px;color:var(--muted)}.setting-line input{border:1px solid var(--line);border-radius:7px;padding:8px}.setting-line label:nth-child(2){grid-template-columns:auto 70px auto;align-items:center}.setting-line label:nth-child(2) input{grid-column:2}.setting-line label:nth-child(2) span{grid-column:3}.supply-tag{color:#536078}.decision-tag{color:#c1434f}@media(max-width:900px){.settings-grid{grid-template-columns:1fr}.sprint-settings{grid-column:auto}.setting-row{grid-template-columns:1fr 1fr}.setting-row .icon-btn{justify-self:end}}
+
+.inline-milestone{margin-left:-19px;z-index:5}
+#taskDialog [hidden]{display:none!important}
+.milestone.keystep{background:#0891b2!important;box-shadow:0 0 0 1px #0e7490!important}.diamond.keystep{background:#0891b2}.type-badge.keystep{background:#e0f5f9;color:#0e7490}
+.inline-chip{padding:2px 6px;border-radius:8px;background:#ffe7e9;color:#b83d47;font-weight:800;cursor:pointer;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.inline-chip:hover{text-decoration:underline}
+  </style>
+  <style>
+.timeline-row {
+  background-image: none;
+}
+
+.baseline,
+.baseline-line {
+  display: none !important;
+}
+
+.bar.task-research {
+  background: #2563c9 !important;
+  color: #fff !important;
+}
+
+.test-state.state-en-cours{background:#e5edff;color:#315db9}
+.test-state.state-en-redaction-rapport{background:#f3e8ff;color:#7a3eb1}.test-status-select{border:0;max-width:180px;cursor:pointer}
+.tests-actions{display:flex;gap:9px;align-items:center}.test-remove{border:0;background:transparent;color:#c04b56;font-size:11px;padding:10px 0 0;cursor:pointer}.test-remove:hover{text-decoration:underline}@media(max-width:700px){.tests-actions{align-items:stretch;flex-direction:column}}
+
+.skill-catalog-form {
+  display: flex;
+  gap: 8px;
+  max-width: 560px;
+}
+
+.skill-catalog-form input {
+  flex: 1;
+  min-width: 180px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 9px;
+}
+
+.skill-catalog-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 14px;
+}
+
+.skill-catalog-chip {
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: #eef5ff;
+  color: #315f9b;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+#taskSkills {
+  min-height: 122px;
+}
+
+#taskSkills option {
+  padding: 5px 7px;
+}
+
+.weekly-load-panel {
+  grid-column: 1 / -1;
+  overflow: hidden;
+}
+
+.capacity-layout > .skill-panel {
+  grid-column: 1 / -1;
+}
+
+.load-chart-wrap {
+  overflow-x: auto;
+}
+
+.load-chart {
+  display: block;
+  width: 100%;
+  min-width: 850px;
+  height: auto;
+}
+
+.load-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin-bottom: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.load-chart-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.load-chart-legend i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.load-chart-note {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.kpis {
+  grid-template-columns: repeat(3, minmax(150px, 1fr));
+}
+
+@media (max-width: 900px) {
+  .kpis {
+    grid-template-columns: repeat(2, minmax(140px, 1fr));
+  }
+
+  .kpis .kpi:last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+.specs-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.specs-heading h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.specs-heading select {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 9px 11px;
+  color: var(--ink);
+}
+
+.spec-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(130px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.spec-summary-card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 12px 14px;
+}
+
+.spec-summary-card strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 22px;
+}
+
+.spec-summary-card span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.spec-section {
+  margin-bottom: 14px;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.spec-section h3 {
+  margin: 0;
+  padding: 13px 16px;
+  background: #f7f9fc;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+}
+
+.spec-table-wrap {
+  overflow-x: auto;
+}
+
+.spec-table {
+  width: 100%;
+  min-width: 820px;
+  border-collapse: collapse;
+}
+
+.spec-table th,
+.spec-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #edf0f4;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.spec-table th {
+  color: var(--muted);
+  background: #fbfcfe;
+  font-size: 11px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.spec-table td {
+  font-size: 12px;
+}
+
+.spec-table td:first-child {
+  width: 29%;
+  font-weight: 700;
+}
+
+.spec-table td:nth-child(2) {
+  width: 22%;
+}
+
+.spec-table td:nth-child(3) {
+  color: var(--muted);
+}
+
+.spec-status {
+  min-width: 178px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  padding: 7px 9px;
+  font-weight: 750;
+}
+
+.spec-status.status-valide { background: #e6f7f0; color: #167457; border-color: #b9e8d7; }
+.spec-status.status-en-cours { background: #fff5dc; color: #8c650b; border-color: #f0d98f; }
+.spec-status.status-degrade { background: #ffe9e5; color: #b54736; border-color: #efc1b8; }
+.spec-status.status-enleve { background: #eceff3; color: #606a79; border-color: #d8dde5; }
+
+@media (max-width: 700px) {
+  .specs-heading { align-items: stretch; flex-direction: column; }
+  .spec-summary { grid-template-columns: 1fr 1fr; }
+}
+
+.data-transfer-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 16px;
+}
+
+.data-transfer-panel h2 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+.data-transfer-panel .settings-note {
+  margin: 0;
+}
+
+.data-transfer-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+
+@media (max-width: 760px) {
+  .data-transfer-panel,
+  .data-transfer-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
+.setting-row .p-team,
+#taskTeam {
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 8px;
+  background: white;
+}
+
+.setting-row {
+  grid-template-columns: 1.1fr 1fr 85px 150px 32px;
+}
+
+.task-setting {
+  grid-template-columns: 1fr auto auto auto;
+}
+
+@media (max-width: 900px) {
+  .setting-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+#taskOwner[multiple] {
+  min-height: 108px;
+  padding: 5px;
+}
+
+#taskOwner[multiple] option {
+  padding: 6px 8px;
+  border-radius: 5px;
+}
+
+.field-help {
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 11px;
+}
+
+.date-field {
+  display: none !important;
+}
+
+.legacy-hours {
+  display: none !important;
+}
+
+.allocation-box {
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 12px;
+  margin: 2px 0 14px;
+}
+
+.allocation-box legend {
+  padding: 0 6px;
+  color: #4c566a;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.allocation-row {
+  display: grid !important;
+  grid-template-columns: 160px 1fr 70px 14px;
+  gap: 10px !important;
+  align-items: center;
+  margin: 7px 0 !important;
+}
+
+.allocation-row > span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.allocation-row input[type="range"] {
+  padding: 0;
+}
+
+.allocation-row .allocation-number {
+  padding: 7px;
+}
+
+.allocation-empty {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.allocation-chip {
+  padding: 2px 6px;
+  border-radius: 8px;
+  background: #e9f8f3;
+  color: #18795d;
+  font-weight: 800;
+}
+
+.duration-chip {
+  padding: 2px 6px;
+  border-radius: 8px;
+  background: #eef5ff;
+  color: #315f9b;
+  font-weight: 800;
+}
+
+.avatar-stack {
+  display: flex;
+  padding-left: 7px;
+}
+
+.avatar-stack .avatar {
+  margin-left: -7px;
+  border: 2px solid white;
+}
+
+.drag-handle {
+  position: absolute;
+  left: 4px;
+  color: #a6afbf;
+  cursor: grab;
+  letter-spacing: -3px;
+  user-select: none;
+}
+
+.gantt-row.dragging {
+  opacity: .45;
+}
+
+.gantt-row.drag-over {
+  box-shadow: inset 0 3px 0 var(--accent);
+}
+
+.bar.moving {
+  cursor: grabbing;
+  opacity: .8;
+  z-index: 4;
+}
+
+.group-chip {
+  padding: 2px 6px;
+  border-radius: 8px;
+  background: #e9edf5;
+  color: #536078;
+  font-weight: 700;
+}
+
+.dependency-chip {
+  max-width: 145px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #52657a;
+  font-weight: 700;
+}
+
+.bar.dependency-driven {
+  box-shadow: 0 0 0 2px rgba(37, 99, 201, .18), 0 2px 6px rgba(23, 32, 51, .1);
+}
+
+.milestone {
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.milestone.moving {
+  z-index: 6;
+  cursor: grabbing;
+  opacity: .82;
+  box-shadow: 0 0 0 3px rgba(239, 89, 100, .2), 0 3px 8px rgba(23, 32, 51, .22);
+}
+
+.decision-checklist{border:1px solid var(--line);border-radius:9px;padding:14px;margin:4px 0 14px}.decision-checklist legend{padding:0 6px;font-size:12px;font-weight:750;color:#4c566a}.decision-check-row{display:grid;grid-template-columns:22px 1fr 30px;gap:8px;align-items:center;margin-bottom:8px}.decision-check-row .decision-check{width:18px;height:18px;accent-color:var(--accent)}.decision-check-row .decision-check-label{margin:0}.decision-check-row .icon-btn{font-size:18px}.checklist-add{margin-top:2px}.decision-checklist .field-help{display:block;margin-top:9px}.checklist-chip{color:#237a61;font-weight:700}
+.decision-hidden{display:none!important}
+
+.tests-heading{display:flex;align-items:end;justify-content:space-between;gap:18px;margin-bottom:14px}.tests-heading h2{margin:0;font-size:20px}.tests-heading select{border:1px solid var(--line);background:#fff;border-radius:8px;padding:9px 12px;color:var(--ink)}.test-summary{display:grid;grid-template-columns:repeat(5,minmax(120px,1fr));gap:10px;margin-bottom:14px}.test-summary-card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center}.test-summary-card span{font-size:12px;color:var(--muted)}.test-summary-card strong{font-size:22px}.test-board{display:grid;grid-template-columns:repeat(3,minmax(240px,1fr));gap:12px}.test-card{background:#fff;border:1px solid var(--line);border-radius:11px;padding:17px;min-height:178px}.test-card-top,.test-meta{display:flex;justify-content:space-between;align-items:center;gap:10px}.test-level,.test-state{font-size:10px;font-weight:800;letter-spacing:.04em;border-radius:5px;padding:5px 7px}.test-level{background:#fff1d7;color:#96610a}.test-level.scale{background:#eee9ff;color:#6145bd}.test-state.state-bloque{background:#f0f2f5;color:#6d7688}.test-state.state-preparable{background:#fff1d7;color:#96610a}.test-state.state-disponible{background:#ddf7ed;color:#137458}.test-state.state-en\ cours{background:#e5edff;color:#315db9}.test-state.state-valide{background:#dff6ea;color:#137458}.test-card h3{font-size:16px;margin:17px 0 7px}.test-condition{color:var(--muted);font-size:12px;min-height:34px;margin:0 0 14px}.test-progress{height:7px;background:#edf0f5;border-radius:5px;overflow:hidden}.test-progress i{display:block;height:100%;background:var(--accent)}.test-meta{font-size:11px;color:var(--muted);margin-top:12px}.test-empty{grid-column:1/-1;color:var(--muted)}@media(max-width:1050px){.test-board{grid-template-columns:repeat(2,minmax(230px,1fr))}.test-summary{grid-template-columns:repeat(3,1fr)}}@media(max-width:700px){.tests-heading{align-items:stretch;flex-direction:column}.test-board{grid-template-columns:1fr}.test-summary{grid-template-columns:repeat(2,1fr)}}
+
+.lag-chip {
+  padding: 2px 6px;
+  border-radius: 8px;
+  background: #fff0f1;
+  color: #b83d47;
+  font-weight: 800;
+}
+
+/* La classe générée depuis la phase française est « Recherche ». */
+.bar.Recherche,
+.bar.task-research {
+  background-color: #2563c9 !important;
+  background-image: none !important;
+  color: #fff !important;
+}
+
+.sync-pill{display:inline-flex;align-items:center;gap:6px;margin-left:10px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;background:#eef1f5;color:#6d7688;vertical-align:middle;white-space:nowrap}
+.sync-pill:before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.sync-pill[data-state="ok"]{background:#e6f7f0;color:#167457}
+.sync-pill[data-state="saving"],.sync-pill[data-state="pending"]{background:#fff5dc;color:#8c650b}
+.sync-pill[data-state="error"]{background:#ffe9e5;color:#b54736}
+@media(max-width:620px){.sync-pill{margin:6px 0 0;display:flex;width:max-content}}
+
+  </style>
+<style id="rdpSharepointStyle">
+.rdp-overlay{position:fixed;inset:0;z-index:9000;background:#f3f5f8;display:flex;align-items:center;justify-content:center;padding:16px;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#172033}
+.rdp-overlay[hidden]{display:none!important}
+.rdp-card{background:#fff;border:1px solid #dfe4eb;border-radius:14px;padding:28px 24px;max-width:440px;width:100%;box-shadow:0 10px 30px rgba(13,19,35,.08);text-align:center}
+.rdp-mark{display:inline-grid;place-items:center;width:42px;height:42px;border-radius:10px;background:#0d1323;color:#4fe0b5;font-weight:800;font-size:18px}
+.rdp-card h1{font-size:20px;margin:14px 0 6px}
+.rdp-card p{color:#6d7688;font-size:13px;line-height:1.55;margin:0 0 16px}
+.rdp-card .btn{margin:4px}
+.rdp-card small{display:block;color:#8993a5;font-size:11px;margin-top:14px;word-break:break-word}
+.rdp-spin{width:26px;height:26px;margin:4px auto 0;border-radius:50%;border:3px solid #dfe4eb;border-top-color:#18b98b;animation:rdpspin .9s linear infinite}
+@keyframes rdpspin{to{transform:rotate(360deg)}}
+.rdp-user{margin-top:12px;padding:10px;border-radius:10px;background:#171f33;font-size:12px;color:#c9d3e8;line-height:1.4}
+.rdp-user strong{display:block;color:#fff;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rdp-user span{display:block;color:#8f9bb5;font-size:11px}
+.rdp-user button{margin-top:6px;border:0;background:transparent;color:#4fe0b5;font-size:11px;font-weight:700;padding:0;cursor:pointer}
+.rdp-user button:hover{text-decoration:underline}
+#rdpUserMobile{display:none}
+#rdpUserMobile button{border:0;background:transparent;color:#167457;font-size:11px;font-weight:700;cursor:pointer;padding:0 0 0 8px}
+@media (max-width:900px){.rdp-user{display:none!important}#rdpUserMobile:not([hidden]){display:inline-block}}
+#rdpSaveBtn:disabled{opacity:.45;cursor:default}
+.rdp-banner{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:#fff5dc;color:#7a5608;border:1px solid #f1dca0;border-radius:10px;padding:10px 14px;margin:0 0 14px;font-size:13px}
+.rdp-banner[hidden]{display:none!important}
+.rdp-banner.error{background:#ffe9e5;color:#93392b;border-color:#f5c4ba}
+#rdpModal form{padding:23px}
+#rdpModal .rdp-modal-text{color:#3d4658;font-size:13px;line-height:1.55;margin:0 0 16px}
+#rdpModal .dialog-actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.data-transfer-panel.rdp-discreet{padding-top:14px;padding-bottom:14px}
+.data-transfer-panel.rdp-discreet h2{font-size:15px}
+body.rdp-readonly #addTaskBtn,body.rdp-readonly #groupTasksBtn,body.rdp-readonly #addTestBtn,
+body.rdp-readonly #addPersonBtn,body.rdp-readonly #addSupplyBtn,body.rdp-readonly #addKeyStepBtn,
+body.rdp-readonly #addSkillBtn,body.rdp-readonly .skill-catalog-form,body.rdp-readonly .remove-person,
+body.rdp-readonly .test-remove,body.rdp-readonly .drag-handle,body.rdp-readonly #deleteBtn,
+body.rdp-readonly #saveBtn,body.rdp-readonly #addChecklistItem,body.rdp-readonly .decision-check-remove,
+body.rdp-readonly #rdpSaveBtn,body.rdp-readonly #resetBtn{display:none!important}
+body.rdp-readonly .bar,body.rdp-readonly .milestone{cursor:default}
+</style>
+  <script>
+(function(){try{var k='__rdp_t';window.localStorage.setItem(k,'1');window.localStorage.removeItem(k);}catch(e){var m={};var s={getItem:function(k){return Object.prototype.hasOwnProperty.call(m,k)?m[k]:null},setItem:function(k,v){m[k]=String(v)},removeItem:function(k){delete m[k]},clear:function(){m={}},key:function(i){return Object.keys(m)[i]||null},get length(){return Object.keys(m).length}};try{Object.defineProperty(window,'localStorage',{value:s,configurable:true});}catch(_){}}})();
+</script>
+<script>
+/* Planning partagé : repère chaque écriture des données du planning pour la synchroniser. */
+(function(){
+  var KEYS=['rdpilot.tasks','rdpilot.team','rdpilot.config','rdpilot.skillCatalog','rdpilot.specStatuses'];
+  var S=window.__rdpSync={keys:KEYS,listeners:[],applying:false};
+  function notify(k){if(S.applying||KEYS.indexOf(k)<0)return;S.listeners.forEach(function(fn){try{fn(k)}catch(e){}});}
+  try{
+    var ls=window.localStorage;
+    if(typeof Storage!=='undefined'&&ls instanceof Storage){
+      var orig=Storage.prototype.setItem;
+      Storage.prototype.setItem=function(k,v){orig.call(this,k,v);if(this===window.localStorage)notify(k);};
+    }else if(ls){
+      var o=ls.setItem;ls.setItem=function(k,v){o.call(ls,k,v);notify(k);};
+    }
+  }catch(e){}
+})();
+</script>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand"><span class="mark">R</span><span>R&amp;D Pilot</span></div>
+      <nav aria-label="Navigation principale">
+        <button class="nav-item active" data-view="planning"><span>▤</span> Planning</button>
+        <button class="nav-item" data-view="capacity"><span>◫</span> Charge équipe</button>
+        <button class="nav-item" data-view="tests"><span>◉</span> Tests</button>
+        <button class="nav-item" data-view="specs"><span>✓</span> Specs</button>
+        <button class="nav-item" data-view="settings"><span>⚙</span> Paramètres</button>
+      </nav>
+      <div class="side-section">
+        <p class="eyebrow">PROGRAMME ACTIF</p>
+        <button class="project-card">
+          <span class="project-dot"></span>
+          <span><strong>SSCB 1200 V</strong><small>Prototype &amp; validation</small></span>
+        </button>
+      </div>
+      <div class="team-mini" id="teamMini"></div>
+      <button class="reset" id="resetBtn" hidden>↺ Réinitialiser la démo</button>
+      <div class="rdp-user" id="rdpUser" hidden></div>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <div>
+          <div class="breadcrumb">Programmes / SSCB 1200 V <span id="syncStatus" class="sync-pill" data-state="pending" role="status">Connexion…</span><span id="rdpUserMobile" hidden></span></div>
+          <h1 id="viewTitle">Planning R&amp;D</h1>
+        </div>
+        <div class="header-actions">
+          <button class="btn ghost" id="todayBtn">Aujourd’hui</button>
+          <button class="btn ghost" id="groupTasksBtn">Regrouper</button>
+          <button class="btn primary" id="addTaskBtn">＋ Nouvelle tâche</button>
+          <button class="btn primary" id="rdpSaveBtn" type="button" hidden disabled title="Enregistrer sur SharePoint (Ctrl+S)">Enregistrer</button>
+        </div>
+      </header>
+      <div class="rdp-banner" id="rdpBanner" role="status" hidden></div>
+
+      <section id="planningView">
+        <div class="kpis" id="kpis"></div>
+        <div class="toolbar">
+          <div class="segmented" aria-label="Échelle temporelle">
+            <button class="zoom active" data-zoom="week">Semaines</button>
+            <button class="zoom" data-zoom="month">Mois</button>
+          </div>
+          <label class="search"><span>⌕</span><input id="searchInput" placeholder="Rechercher tâche, skill…"></label>
+          <select id="phaseFilter" aria-label="Filtrer par phase">
+            <option value="all">Toutes les phases</option>
+            <option>Recherche</option><option>Prototype</option><option>Tests prototype</option><option>Tests à l'échelle</option><option>Supply</option>
+          </select>
+          <input type="checkbox" id="baselineToggle" hidden>
+        </div>
+
+        <div class="gantt-card">
+          <div class="gantt-head">
+            <div class="task-head">Tâches <span id="taskCount"></span></div>
+            <div class="timeline-head" id="timelineHead"></div>
+          </div>
+          <div id="ganttBody"></div>
+        </div>
+        <div class="legend"><span><i class="leg research"></i>Recherche</span><span><i class="leg prototype"></i>Prototype</span><span><i class="leg test"></i>Tests</span><span><i class="leg scale"></i>Échelle</span><span><i class="diamond"></i>Jalon TRL</span><span><i class="diamond keystep"></i>Étape clé</span></div>
+      </section>
+
+      <section id="capacityView" hidden>
+        <div class="capacity-layout">
+          <div id="capacityGrid" hidden></div>
+          <div class="panel skill-panel">
+            <p class="eyebrow">COUVERTURE</p><h2>Compétences critiques</h2>
+            <div id="skillCoverage"></div>
+          </div>
+          <div class="panel weekly-load-panel">
+            <div class="panel-title"><div><p class="eyebrow">CHARGE HEBDOMADAIRE</p><h2>Points durs par personne</h2></div></div>
+            <div id="weeklyLoadChart"></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="specsView" hidden>
+        <div class="specs-heading">
+          <div><p class="eyebrow">POWERSWITCHER 800 V 600 A</p><h2>Suivi de validation des spécifications</h2></div>
+          <select id="specStatusFilter" aria-label="Filtrer les spécifications par état">
+            <option value="all">Tous les états</option>
+            <option>Validé</option>
+            <option>En cours de validation</option>
+            <option>Dégradé</option>
+            <option>Enlevé</option>
+          </select>
+        </div>
+        <div class="spec-summary" id="specSummary"></div>
+        <div id="specTables"></div>
+      </section>
+
+      <section id="testsView" hidden>
+        <div class="tests-heading">
+          <div><p class="eyebrow">READINESS DE VALIDATION</p><h2>Tests disponibles selon l’avancée du développement</h2></div>
+          <div class="tests-actions">
+            <select id="testLevelFilter" aria-label="Filtrer les tests par niveau">
+              <option value="all">Tous les niveaux</option>
+              <option value="prototype">Prototype</option>
+              <option value="scale">À l’échelle</option>
+            </select>
+            <button class="btn primary" type="button" id="addTestBtn">＋ Nouveau test</button>
+          </div>
+        </div>
+        <div class="test-summary" id="testSummary"></div>
+        <div class="test-board" id="testBoard"></div>
+      </section>
+
+      <section id="settingsView" hidden>
+        <div class="panel data-transfer-panel rdp-discreet">
+          <div><p class="eyebrow">SECOURS</p><h2>Export manuel des données</h2><p class="settings-note">Le planning est enregistré sur SharePoint avec le bouton « Enregistrer ». Cet export ne sert qu’à garder une copie de secours sur votre ordinateur.</p></div>
+          <div class="data-transfer-actions">
+            <button class="btn ghost" type="button" id="exportDataBtn">↓ Export JSON de secours</button>
+          </div>
+        </div>
+        <div class="settings-grid">
+          <div class="panel">
+            <div class="panel-title"><div><p class="eyebrow">RESSOURCES</p><h2>Membres de l’équipe</h2></div><button class="btn primary" id="addPersonBtn">＋ Ajouter</button></div>
+            <p class="settings-note">Modifiez les noms, rôles, capacités et compétences utilisées pour les suggestions d’affectation.</p>
+            <div id="peopleSettings"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-title"><div><p class="eyebrow">STRUCTURE</p><h2>Tâches et supply</h2></div><span style="display:flex;gap:8px"><button class="btn ghost" id="addSupplyBtn">＋ Bloc supply</button><button class="btn ghost" id="addKeyStepBtn" style="color:#0e7490;border-color:#b5e3ec">＋ Étape clé</button></span></div>
+            <p class="settings-note">Renommez rapidement les tâches ou ouvrez leur fiche complète.</p>
+            <div id="taskSettings"></div>
+          </div>
+          <div class="panel sprint-settings">
+            <p class="eyebrow">CADENCE</p><h2>Sprints</h2>
+            <div class="setting-line"><label>Premier sprint<input type="date" id="sprintStart" value="2026-09-14"></label><label>Durée<input type="number" id="sprintDays" min="1" value="7"><span>jours</span></label></div>
+            <p class="settings-note">Un jalon vertical est affiché à chaque début de sprint.</p>
+          </div>
+          <div class="panel sprint-settings" id="skillCatalogPanel"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="taskDialog">
+    <form method="dialog" id="taskForm">
+      <div class="dialog-head"><div><p class="eyebrow" id="dialogEyebrow">NOUVELLE TÂCHE</p><h2 id="dialogTitle">Planifier une activité</h2></div><button class="icon-btn" type="button" data-close-dialog aria-label="Fermer">×</button></div>
+      <input type="hidden" id="taskId">
+      <label>Nom de la tâche<input id="taskName" required></label>
+      <div class="form-grid">
+        <label>Type<select id="taskType"><option value="research">Recherche</option><option value="development">Développement</option><option value="supply">Bloc supply</option><option value="decision">Jalon de décision</option></select></label>
+        <label class="decision-optional">Équipe<select id="taskTeam"><option>R&amp;D</option><option>Test</option><option>Mechanical Design</option></select></label>
+        <label class="decision-optional">Phase<select id="taskPhase"><option>Recherche</option><option>Prototype</option><option>Tests prototype</option><option>Tests à l'échelle</option><option>Supply</option></select></label>
+        <label class="decision-optional">Avancement (%)<input id="taskProgress" type="number" min="0" max="100" value="0"></label>
+        <label class="date-field">Début calculé<input id="taskStart" type="date" required></label>
+        <label class="date-field">Fin calculée<input id="taskEnd" type="date" required></label>
+        <label>Durée de réalisation<input id="taskDuration" type="number" min="1" value="5" required><small class="field-help">En jours calendaires</small></label>
+        <label class="decision-optional">Personnes affectées<select id="taskOwner" multiple size="4"></select><small class="field-help">Maintenez Ctrl ou ⌘ pour sélectionner plusieurs personnes.</small></label>
+        <label class="legacy-hours decision-optional">Ancienne charge<input id="taskHours" type="number" min="1" max="100" value="50"></label>
+      </div>
+      <fieldset class="allocation-box decision-optional"><legend>Allocation par personne</legend><div id="allocationEditor"></div><small class="field-help">Pourcentage du temps de travail consacré à cette tâche pendant sa réalisation.</small></fieldset>
+      <label class="decision-optional">Compétences requises<select id="taskSkills" multiple size="5"></select><small class="field-help">Sélectionnez une ou plusieurs compétences. La liste se gère dans Paramètres.</small></label>
+      <label class="decision-optional">Groupe / lot de travail<input id="taskGroup" list="groupList" placeholder="Ex. Carte de puissance, Validation, Supply"><datalist id="groupList"></datalist></label>
+      <label class="decision-optional">Dépend de<select id="taskDependency"><option value="">Aucune dépendance</option></select></label>
+      <label id="triggerField">Supply déclenchée<select id="taskTrigger"><option value="">Aucun bloc supply</option></select></label>
+      <fieldset class="decision-checklist" id="decisionChecklist" hidden>
+        <legend>Checklist de validation du jalon</legend>
+        <div id="decisionChecklistRows"></div>
+        <button class="btn ghost checklist-add" type="button" id="addChecklistItem">+ Ajouter un critère</button>
+        <small class="field-help">Le jalon est validé lorsque toutes les lignes renseignées sont cochées.</small>
+      </fieldset>
+      <label class="check-row"><input id="taskMilestone" type="checkbox"> Jalon TRL</label>
+      <label class="check-row" id="inlineField" hidden><input id="taskInline" type="checkbox"> Afficher le losange sur la ligne de la tâche qui en dépend</label>
+      <label class="check-row" id="keyStepField" hidden><input id="taskKeyStep" type="checkbox"> Étape clé (tout doit être prêt, pas une décision)</label>
+      <label id="hostField" hidden>Afficher sur la ligne de<select id="taskHost"><option value="">Sur sa propre ligne</option></select><small class="field-help">Le losange se place juste avant le début de cette tâche et la suit si elle bouge. Aucun lien avec la supply ni avec les dépendances.</small></label>
+      <div class="match-box" id="matchBox"></div>
+      <div class="dialog-actions"><button class="btn danger" type="button" id="deleteBtn" hidden>Supprimer</button><span></span><button class="btn ghost" type="button" data-close-dialog>Annuler</button><button class="btn primary" value="default" id="saveBtn">Enregistrer</button></div>
+    </form>
+  </dialog>
+  <div class="toast" id="toast" role="status"></div>
+  <script type="text/x-rdpilot-app">
+const DAY=86400000;
+const seedTeam=[];
+const seedTasks=[];
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)],parse=s=>new Date(s+'T00:00:00'),fmt=d=>d.toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
+let team=JSON.parse(localStorage.getItem('rdpilot.team')||'null')||structuredClone(seedTeam);let tasks=(JSON.parse(localStorage.getItem('rdpilot.tasks')||'null')||structuredClone(seedTasks)).map(t=>({...t,type:t.type||(t.milestone?'decision':'activity')}));let config=JSON.parse(localStorage.getItem('rdpilot.config')||'null')||{sprintStart:'2026-09-14',sprintDays:7};let zoom='week',showBaseline=true;
+function initialsFor(n){return n.split(/\s+/).map(x=>x[0]).join('').slice(0,2).toUpperCase()||'NA'}function persist(){localStorage.setItem('rdpilot.tasks',JSON.stringify(tasks));localStorage.setItem('rdpilot.team',JSON.stringify(team));localStorage.setItem('rdpilot.config',JSON.stringify(config))}function person(id){return team.find(x=>x.id===id)||team[0]||{name:'Non affecté',initials:'—',color:'#8993a5',capacity:35,skills:[]}}function loadFor(id){return tasks.filter(t=>t.owner===id&&t.progress<100).reduce((a,t)=>a+t.hours,0)}function phaseClass(p){return p.replaceAll(' ','').replaceAll("'",'')}function bounds(){let dates=tasks.flatMap(t=>[parse(t.start),parse(t.end)]),min=new Date(Math.min(...dates)),max=new Date(Math.max(...dates));min.setDate(min.getDate()-7);max.setDate(max.getDate()+10);return{min,max,total:Math.max(1,Math.round((max-min)/DAY))}}function pct(date,b){return Math.max(0,Math.min(100,(parse(date)-b.min)/DAY/b.total*100))}function phaseColor(p){return({'Recherche':'#5277e8','Prototype':'#18b98b','Tests prototype':'#e5a43b',"Tests à l'échelle":'#8a6be8','Supply':'#27334d'})[p]||'#8993a5'}
+function render(){renderTeam();renderKpis();renderGantt();renderCapacity();renderSettings()}function renderTeam(){$('#teamMini').innerHTML='<p class="eyebrow">ÉQUIPE · '+team.length+'</p>'+team.slice(0,4).map(p=>`<div class="mini-row"><i class="avatar" style="background:${p.color}">${p.initials}</i><span>${p.name}</span><small>${loadFor(p.id)}h</small></div>`).join('')}function renderKpis(){let late=tasks.filter(t=>parse(t.end)>parse(t.baseEnd)&&t.progress<100).length,progress=Math.round(tasks.reduce((a,t)=>a+t.progress,0)/tasks.length),overload=team.filter(p=>loadFor(p.id)>p.capacity).length,trl=tasks.filter(t=>t.milestone&&t.progress===100).length+3;$('#kpis').innerHTML=[['Avancement global',progress+'%','pondération simple'],['Décalages',late,late?'tâches vs baseline':'planning tenu'],['Charge critique',overload,overload?'membre(s) surchargé(s)':'capacité disponible'],['Niveau actuel','TRL '+trl,'objectif : TRL 5']].map((k,i)=>`<div class="kpi"><div class="kpi-label">${k[0]}</div><div class="kpi-value">${k[1]}</div><div class="kpi-note ${i===1&&late?'alert':''}">${k[2]}</div></div>`).join('')}
+function sprintLines(b){let d=parse(config.sprintStart),i=1,out='';while(d<b.min)d=new Date(d.getTime()+config.sprintDays*DAY);while(d<=b.max){out+=`<i class="sprint-line" data-sprint="${i++}" style="left:${pct(d.toISOString().slice(0,10),b)}%"></i>`;d=new Date(d.getTime()+config.sprintDays*DAY)}return out}
+function renderGantt(){let q=$('#searchInput').value.toLowerCase(),phase=$('#phaseFilter').value,list=tasks.filter(t=>(phase==='all'||t.phase===phase)&&(!q||(t.name+' '+t.skills.join(' ')).toLowerCase().includes(q))),b=bounds(),start=new Date(b.min),cols=zoom==='week'?Math.ceil(b.total/7):Math.ceil(b.total/30);$('#timelineHead').style.gridTemplateColumns=`repeat(${cols},1fr)`;$('#timelineHead').innerHTML=Array.from({length:cols},(_,i)=>{let d=new Date(start);d.setDate(d.getDate()+i*(zoom==='week'?7:30));return `<div class="week-label">${zoom==='week'?'S'+weekNo(d)+' · ':''}${fmt(d)}</div>`}).join('');$('#taskCount').textContent='· '+list.length;$('#ganttBody').innerHTML=list.map(t=>{let p=person(t.owner),left=pct(t.start,b),width=Math.max(t.milestone?1.2:pct(t.end,b)-left+100/b.total),bl=pct(t.baseStart,b),bw=Math.max(1,pct(t.baseEnd,b)-bl+100/b.total),locked=t.type==='supply'&&t.triggeredBy&&tasks.find(x=>x.id==t.triggeredBy)?.progress<100,label=locked?'En attente GO':t.progress+'%';return `<div class="gantt-row"><div class="task-cell" data-id="${t.id}"><div><div class="task-title">${t.name}</div><div class="task-meta"><span><i class="phase-dot" style="background:${phaseColor(t.phase)}"></i> ${t.phase}</span><span>${t.hours}h/sem.</span>${t.type==='decision'?'<span class="decision-tag">Décision</span>':''}${t.type==='supply'?'<span class="supply-tag">Supply</span>':''}</div></div><div class="owner-cell"><i class="avatar" style="background:${p.color}">${p.initials}</i>${p.name}</div><div class="expand">›</div></div><div class="timeline-row">${sprintLines(b)}<i class="today-line" style="left:${pct(new Date().toLocaleDateString('sv-SE'),b)}%"></i>${showBaseline?`<i class="baseline" style="left:${bl}%;width:${bw}%"></i>`:''}${t.milestone?`<i class="milestone ${t.type==='decision'?'decision':''}" data-id="${t.id}" style="left:${left}%"></i>`:`<div class="bar ${phaseClass(t.phase)} ${locked?'supply-locked':''}" data-id="${t.id}" style="left:${left}%;width:${width}%"><i class="progress-fill" style="width:${t.progress}%"></i><em>${label}</em></div>`}</div></div>`}).join('');$$('[data-id]').forEach(el=>el.onclick=()=>openTask(+el.dataset.id))}
+function weekNo(d){let x=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));x.setUTCDate(x.getUTCDate()+4-(x.getUTCDay()||7));return Math.ceil((((x-new Date(Date.UTC(x.getUTCFullYear(),0,1)))/DAY)+1)/7)}
+function renderCapacity(){$('#capacityGrid').innerHTML=team.map(p=>{let load=loadFor(p.id),ratio=Math.round(load/p.capacity*100),cl=ratio>110?'over':ratio>90?'warn':'';return `<div class="capacity-row"><div class="person"><i class="avatar" style="background:${p.color}">${p.initials}</i><span><strong>${p.name}</strong><small>${p.role}</small></span></div><div class="load-track"><i class="load-fill ${cl}" style="width:${Math.min(100,ratio)}%"></i></div><div class="load-num">${ratio}%</div></div>`}).join('');let all=[...new Set(tasks.flatMap(t=>t.skills))];$('#skillCoverage').innerHTML=all.slice(0,8).map(s=>{let count=team.filter(p=>p.skills.some(x=>x.toLowerCase()===s.toLowerCase())).length;return `<div class="skill-item"><div class="skill-name">${s}<span class="${count<2?'risk':''}">${count} personne${count>1?'s':''}</span></div><div class="skill-bar"><i style="width:${Math.min(100,count/3*100)}%"></i></div></div>`}).join('')}
+function renderSettings(){$('#peopleSettings').innerHTML=team.map(p=>`<div class="setting-row" data-person="${p.id}"><input class="p-name" value="${p.name}" aria-label="Nom"><input class="p-role" value="${p.role}" aria-label="Rôle"><input class="p-cap" type="number" value="${p.capacity}" aria-label="Capacité"><button class="icon-btn remove-person" aria-label="Supprimer">×</button><input class="p-skills" value="${p.skills.join(', ')}" aria-label="Compétences" style="grid-column:1/-1"></div>`).join('');$('#taskSettings').innerHTML=tasks.map(t=>`<div class="task-setting" data-task="${t.id}"><input class="quick-name" value="${t.name}" aria-label="Nom de tâche"><span class="type-badge ${t.type}">${t.type==='supply'?'SUPPLY':t.type==='decision'?'DÉCISION':'R&D'}</span><button class="icon-btn edit-task" aria-label="Modifier">›</button></div>`).join('');$('#sprintStart').value=config.sprintStart;$('#sprintDays').value=config.sprintDays;bindSettings()}
+function bindSettings(){$$('.setting-row').forEach(r=>{let id=r.dataset.person,save=()=>{let p=person(id);p.name=r.querySelector('.p-name').value;p.initials=initialsFor(p.name);p.role=r.querySelector('.p-role').value;p.capacity=+r.querySelector('.p-cap').value||35;p.skills=r.querySelector('.p-skills').value.split(',').map(x=>x.trim()).filter(Boolean);persist();renderTeam();renderCapacity()};r.querySelectorAll('input').forEach(x=>x.onchange=save);r.querySelector('.remove-person').onclick=()=>{if(team.length<2)return toast('Gardez au moins une personne');tasks.filter(t=>t.owner===id).forEach(t=>t.owner=team.find(x=>x.id!==id).id);team=team.filter(x=>x.id!==id);persist();render()}});$$('.task-setting').forEach(r=>{r.querySelector('.quick-name').onchange=e=>{tasks.find(t=>t.id==r.dataset.task).name=e.target.value;persist();renderGantt()};r.querySelector('.edit-task').onclick=()=>openTask(+r.dataset.task)});$('#sprintStart').onchange=e=>{config.sprintStart=e.target.value;persist();renderGantt()};$('#sprintDays').onchange=e=>{config.sprintDays=Math.max(1,+e.target.value||7);persist();renderGantt()}}
+function fillSelectors(){$('#taskOwner').innerHTML=team.map(p=>`<option value="${p.id}">${p.name} — ${p.role}</option>`).join('');$('#taskDependency').innerHTML='<option value="">Aucune dépendance</option>'+tasks.map(t=>`<option value="${t.id}">${t.name}</option>`).join('');$('#taskTrigger').innerHTML='<option value="">Aucun bloc supply</option>'+tasks.filter(t=>t.type==='supply').map(t=>`<option value="${t.id}">${t.name}</option>`).join('')}function syncType(){let type=$('#taskType').value;$('#triggerField').hidden=type!=='decision';$('#taskMilestone').checked=type==='decision'||$('#taskMilestone').checked;if(type==='supply')$('#taskPhase').value='Supply';updateMatch()}
+function openTask(id,preset){fillSelectors();let t=tasks.find(x=>x.id===id),type=t?.type||preset||'activity';$('#dialogEyebrow').textContent=t?'MODIFIER LA TÂCHE':type==='supply'?'NOUVEAU BLOC SUPPLY':'NOUVELLE TÂCHE';$('#dialogTitle').textContent=t?t.name:type==='supply'?'Planifier un délai supply':'Planifier une activité';$('#taskId').value=t?.id||'';$('#taskName').value=t?.name||'';$('#taskType').value=type;$('#taskPhase').value=t?.phase||(type==='supply'?'Supply':'Recherche');$('#taskProgress').value=t?.progress||0;$('#taskStart').value=t?.start||'2026-09-21';$('#taskEnd').value=t?.end||'2026-10-02';$('#taskOwner').value=t?.owner||team[0]?.id;$('#taskHours').value=t?.hours||8;$('#taskSkills').value=t?.skills.join(', ')||(type==='supply'?'Supply':'');$('#taskDependency').value=t?.dep||'';$('#taskTrigger').value=t?.trigger||'';$('#taskMilestone').checked=t?.milestone||type==='decision';$('#deleteBtn').hidden=!t;syncType();$('#taskDialog').showModal()}
+function updateMatch(){let skills=$('#taskSkills').value.toLowerCase().split(',').map(x=>x.trim()).filter(Boolean),ranked=team.map(p=>({p,score:skills.filter(s=>p.skills.some(x=>x.toLowerCase().includes(s)||s.includes(x.toLowerCase()))).length,load:loadFor(p.id)/p.capacity})).sort((a,b)=>b.score-a.score||a.load-b.load),r=ranked[0];$('#matchBox').innerHTML=!r?'Ajoutez un membre dans les paramètres.':skills.length?`Meilleur profil disponible : <strong>${r.p.name}</strong> · ${r.score}/${skills.length} compétences · charge ${Math.round(r.load*100)}%`:'Ajoutez des compétences pour obtenir une suggestion.'}
+function saveTask(e){e.preventDefault();let id=+$('#taskId').value,old=tasks.find(t=>t.id===id),type=$('#taskType').value,t={id:id||Date.now(),name:$('#taskName').value,phase:type==='supply'?'Supply':$('#taskPhase').value,start:$('#taskStart').value,end:$('#taskEnd').value,baseStart:old?.baseStart||$('#taskStart').value,baseEnd:old?.baseEnd||$('#taskEnd').value,owner:$('#taskOwner').value,hours:+$('#taskHours').value,progress:+$('#taskProgress').value,skills:$('#taskSkills').value.split(',').map(s=>s.trim()).filter(Boolean),dep:+$('#taskDependency').value||'',milestone:type==='decision'||$('#taskMilestone').checked,type,trigger:type==='decision'?(+$('#taskTrigger').value||''):'',triggeredBy:old?.triggeredBy||''};if(parse(t.end)<parse(t.start))return toast('La fin doit être après le début');if(old)Object.assign(old,t);else tasks.push(t);tasks.forEach(x=>{if(x.triggeredBy==t.id)x.triggeredBy=''});if(t.trigger){let supply=tasks.find(x=>x.id==t.trigger);if(supply){supply.triggeredBy=t.id;supply.dep=t.id}}persist();$('#taskDialog').close();render();toast(old?'Tâche mise à jour':'Tâche ajoutée')}
+function toast(msg){let el=$('#toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2200)}
+$$('.nav-item').forEach(b=>b.onclick=()=>{$$('.nav-item').forEach(x=>x.classList.remove('active'));b.classList.add('active');['planning','capacity','settings'].forEach(v=>$('#'+v+'View').hidden=v!==b.dataset.view);$('#viewTitle').textContent={planning:'Planning R&D',capacity:'Charge & compétences',settings:'Paramètres'}[b.dataset.view]});$$('.zoom').forEach(b=>b.onclick=()=>{$$('.zoom').forEach(x=>x.classList.remove('active'));b.classList.add('active');zoom=b.dataset.zoom;renderGantt()});
+$('#addTaskBtn').onclick=()=>openTask();$('#addSupplyBtn').onclick=()=>openTask(null,'supply');$('#addPersonBtn').onclick=()=>{let id='p'+Date.now();team.push({id,name:'Nouveau membre',role:'Rôle',initials:'NM',color:'#4f91a8',capacity:35,skills:[]});persist();render()};$('#taskType').onchange=syncType;$('#taskForm').addEventListener('submit',saveTask);$('#taskSkills').oninput=updateMatch;$('#searchInput').oninput=renderGantt;$('#phaseFilter').onchange=renderGantt;$('#baselineToggle').onchange=e=>{showBaseline=e.target.checked;renderGantt()};$('#todayBtn').onclick=()=>toast('La ligne rouge indique aujourd’hui');$('#deleteBtn').onclick=()=>{let id=+$('#taskId').value;tasks=tasks.filter(t=>t.id!==id);tasks.forEach(t=>{if(t.dep==id)t.dep='';if(t.trigger==id)t.trigger='';if(t.triggeredBy==id)t.triggeredBy=''});persist();$('#taskDialog').close();render();toast('Tâche supprimée')};$('#resetBtn').onclick=()=>{team=structuredClone(seedTeam);tasks=structuredClone(seedTasks);config={sprintStart:'2026-09-14',sprintDays:7};persist();render();toast('Données de démonstration restaurées')};render();
+
+  </script>
+  <script type="text/x-rdpilot-app">
+const PLANNING_END = '2026-12-31';
+const renderGanttBase = renderGantt;
+
+bounds = function () {
+  const starts = tasks.map(task => parse(task.start));
+  const min = new Date(Math.min(...starts));
+  const max = parse(PLANNING_END);
+  min.setDate(min.getDate() - 7);
+  return {
+    min,
+    max,
+    total: Math.max(1, Math.round((max - min) / DAY))
+  };
+};
+
+renderGantt = function () {
+  const allTasks = tasks;
+  tasks = allTasks.filter(task => parse(task.start) <= parse(PLANNING_END));
+  renderGanttBase();
+  tasks = allTasks;
+};
+
+renderGantt();
+
+  </script>
+  <script type="text/x-rdpilot-app">
+const TEAM_GROUPS = ['R&D', 'Test', 'Mechanical Design'];
+
+tasks.forEach(task => {
+  if (task.type === 'activity') {
+    task.type = task.phase === 'Recherche' ? 'research' : 'development';
+  }
+  task.teamGroup ||= task.phase.startsWith('Tests') ? 'Test' : 'R&D';
+});
+
+team.forEach(member => {
+  member.teamGroup ||= member.role.toLowerCase().includes('validation')
+    ? 'Test'
+    : member.role.toLowerCase().includes('mécanique')
+      ? 'Mechanical Design'
+      : 'R&D';
+});
+
+const renderGanttTaxonomyBase = renderGantt;
+renderGantt = function () {
+  renderGanttTaxonomyBase();
+  $$('.bar[data-id]').forEach(bar => {
+    const task = tasks.find(item => item.id == bar.dataset.id);
+    if (task) {
+      bar.classList.add(`task-${task.type}`);
+      if (task.type === 'research') {
+        bar.style.setProperty('background-color', '#2563c9', 'important');
+        bar.style.setProperty('background-image', 'none', 'important');
+        bar.style.setProperty('color', '#ffffff', 'important');
+      }
+    }
+  });
+};
+
+const openTaskTaxonomyBase = openTask;
+openTask = function (id, preset) {
+  const normalizedPreset = preset || (id ? undefined : 'development');
+  openTaskTaxonomyBase(id, normalizedPreset);
+  const task = tasks.find(item => item.id === id);
+  $('#taskTeam').value = task?.teamGroup || 'R&D';
+};
+
+const renderSettingsTaxonomyBase = renderSettings;
+renderSettings = function () {
+  renderSettingsTaxonomyBase();
+
+  $$('.setting-row').forEach(row => {
+    const member = team.find(item => item.id === row.dataset.person);
+    const selector = document.createElement('select');
+    selector.className = 'p-team';
+    selector.setAttribute('aria-label', 'Équipe');
+    selector.innerHTML = TEAM_GROUPS.map(group =>
+      `<option ${group === member.teamGroup ? 'selected' : ''}>${group}</option>`
+    ).join('');
+    selector.onchange = () => {
+      member.teamGroup = selector.value;
+      persist();
+    };
+    row.insertBefore(selector, row.querySelector('.remove-person'));
+  });
+
+  $$('.task-setting').forEach(row => {
+    const task = tasks.find(item => item.id == row.dataset.task);
+    const badge = row.querySelector('.type-badge');
+    if (task.type === 'research') badge.textContent = 'RECHERCHE';
+    if (task.type === 'development') badge.textContent = 'DÉVELOPPEMENT';
+    const group = document.createElement('span');
+    group.className = 'type-badge';
+    group.textContent = task.teamGroup;
+    row.insertBefore(group, row.querySelector('.edit-task'));
+  });
+};
+
+$('#taskForm').addEventListener('submit', () => {
+  const editedId = +$('#taskId').value;
+  const editedName = $('#taskName').value;
+  setTimeout(() => {
+    const task = tasks.find(item => item.id === editedId) || [...tasks].reverse().find(item => item.name === editedName);
+    if (!task) return;
+    task.teamGroup = $('#taskTeam').value;
+    persist();
+    render();
+  }, 0);
+});
+
+$('#addTaskBtn').onclick = () => openTask(null, 'development');
+persist();
+render();
+
+  </script>
+  <script type="text/x-rdpilot-app">
+tasks.forEach(task => {
+  task.assignees = Array.isArray(task.assignees) && task.assignees.length
+    ? task.assignees
+    : task.owner ? [task.owner] : [];
+  task.owner = task.assignees[0] || task.owner;
+});
+
+loadFor = function (personId) {
+  return tasks
+    .filter(task => task.progress < 100 && (task.assignees || [task.owner]).includes(personId))
+    .reduce((total, task) => total + task.hours, 0);
+};
+
+const renderGanttMultiBase = renderGantt;
+renderGantt = function () {
+  renderGanttMultiBase();
+  $$('.task-cell[data-id]').forEach(cell => {
+    const task = tasks.find(item => item.id == cell.dataset.id);
+    if (!task) return;
+    const assignees = (task.assignees || [task.owner]).map(person).filter(Boolean);
+    const ownerCell = cell.querySelector('.owner-cell');
+    ownerCell.innerHTML = `<span class="avatar-stack">${assignees.slice(0, 3).map(member =>
+      `<i class="avatar" title="${member.name}" style="background:${member.color}">${member.initials}</i>`
+    ).join('')}</span>${assignees.length > 3 ? `<small>+${assignees.length - 3}</small>` : ''}`;
+    ownerCell.setAttribute('aria-label', assignees.map(member => member.name).join(', '));
+  });
+};
+
+const openTaskMultiBase = openTask;
+openTask = function (id, preset) {
+  openTaskMultiBase(id, preset);
+  const task = tasks.find(item => item.id === id);
+  const selected = task?.assignees || (task?.owner ? [task.owner] : [team[0]?.id]);
+  [...$('#taskOwner').options].forEach(option => {
+    option.selected = selected.includes(option.value);
+  });
+};
+
+const renderSettingsMultiBase = renderSettings;
+renderSettings = function () {
+  renderSettingsMultiBase();
+  $$('.setting-row').forEach(row => {
+    const personId = row.dataset.person;
+    const removeButton = row.querySelector('.remove-person');
+    const removeBase = removeButton.onclick;
+    removeButton.onclick = () => {
+      tasks.forEach(task => {
+        task.assignees = (task.assignees || [task.owner]).filter(id => id !== personId);
+        if (!task.assignees.length) {
+          const replacement = team.find(member => member.id !== personId);
+          if (replacement) task.assignees = [replacement.id];
+        }
+        task.owner = task.assignees[0] || '';
+      });
+      removeBase();
+    };
+  });
+};
+
+$('#taskForm').addEventListener('submit', () => {
+  const editedId = +$('#taskId').value;
+  const editedName = $('#taskName').value;
+  const selectedPeople = [...$('#taskOwner').selectedOptions].map(option => option.value);
+  setTimeout(() => {
+    const task = tasks.find(item => item.id === editedId) || [...tasks].reverse().find(item => item.name === editedName);
+    if (!task) return;
+    task.assignees = selectedPeople.length ? selectedPeople : [team[0]?.id].filter(Boolean);
+    task.owner = task.assignees[0] || '';
+    persist();
+    render();
+  }, 0);
+});
+
+persist();
+render();
+
+  </script>
+  <script type="text/x-rdpilot-app">
+tasks.forEach((task, index) => {
+  task.group ||= '';
+  task.order ??= index;
+});
+
+function datePlusDays(dateString, delta) {
+  const date = parse(dateString);
+  date.setDate(date.getDate() + delta);
+  return date.toISOString().slice(0, 10);
+}
+
+const renderGanttInteractionsBase = renderGantt;
+renderGantt = function () {
+  renderGanttInteractionsBase();
+
+  $$('.gantt-row').forEach(row => {
+    const cell = row.querySelector('.task-cell[data-id]');
+    if (!cell) return;
+    const task = tasks.find(item => item.id == cell.dataset.id);
+    row.dataset.taskId = task.id;
+    row.draggable = true;
+    cell.insertAdjacentHTML('afterbegin', '<span class="drag-handle" title="Déplacer la tâche">⋮⋮</span>');
+
+    if (task.group) {
+      cell.querySelector('.task-meta').insertAdjacentHTML('beforeend', `<span class="group-chip">${task.group}</span>`);
+    }
+
+    row.addEventListener('dragstart', event => {
+      event.dataTransfer.setData('text/task-id', String(task.id));
+      event.dataTransfer.effectAllowed = 'move';
+      row.classList.add('dragging');
+    });
+    row.addEventListener('dragend', () => row.classList.remove('dragging'));
+    row.addEventListener('dragover', event => {
+      event.preventDefault();
+      row.classList.add('drag-over');
+    });
+    row.addEventListener('dragleave', () => row.classList.remove('drag-over'));
+    row.addEventListener('drop', event => {
+      event.preventDefault();
+      row.classList.remove('drag-over');
+      const sourceId = +event.dataTransfer.getData('text/task-id');
+      const from = tasks.findIndex(item => item.id === sourceId);
+      const to = tasks.findIndex(item => item.id === task.id);
+      if (from < 0 || to < 0 || from === to) return;
+      const [moved] = tasks.splice(from, 1);
+      tasks.splice(to, 0, moved);
+      tasks.forEach((item, index) => item.order = index);
+      persist();
+      render();
+      toast('Ordre des tâches mis à jour');
+    });
+  });
+
+  $$('.bar[data-id]').forEach(bar => {
+    bar.title = 'Glissez horizontalement pour déplacer la tâche';
+    bar.onclick = event => event.stopPropagation();
+    bar.addEventListener('pointerdown', event => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const task = tasks.find(item => item.id == bar.dataset.id);
+      const timeline = bar.closest('.timeline-row');
+      const startX = event.clientX;
+      const originalStart = task.start;
+      const originalEnd = task.end;
+      let movedDays = 0;
+      bar.setPointerCapture(event.pointerId);
+      bar.classList.add('moving');
+
+      const move = moveEvent => {
+        const pixelsPerDay = timeline.clientWidth / bounds().total;
+        movedDays = Math.round((moveEvent.clientX - startX) / pixelsPerDay);
+        bar.style.transform = `translateX(${movedDays * pixelsPerDay}px)`;
+      };
+      const up = upEvent => {
+        bar.releasePointerCapture(upEvent.pointerId);
+        bar.removeEventListener('pointermove', move);
+        bar.removeEventListener('pointerup', up);
+        bar.classList.remove('moving');
+        if (movedDays) {
+          task.start = datePlusDays(originalStart, movedDays);
+          task.end = datePlusDays(originalEnd, movedDays);
+          persist();
+          render();
+          toast(`Tâche décalée de ${movedDays} jour${Math.abs(movedDays) > 1 ? 's' : ''}`);
+        } else {
+          bar.style.transform = '';
+          openTask(task.id);
+        }
+      };
+      bar.addEventListener('pointermove', move);
+      bar.addEventListener('pointerup', up);
+    });
+  });
+};
+
+const openTaskInteractionsBase = openTask;
+openTask = function (id, preset) {
+  openTaskInteractionsBase(id, preset);
+  const task = tasks.find(item => item.id === id);
+  $('#taskGroup').value = task?.group || '';
+  $('#groupList').innerHTML = [...new Set(tasks.map(item => item.group).filter(Boolean))]
+    .map(group => `<option value="${group}"></option>`).join('');
+};
+
+$('#taskForm').addEventListener('submit', () => {
+  const editedId = +$('#taskId').value;
+  const editedName = $('#taskName').value;
+  const group = $('#taskGroup').value.trim();
+  setTimeout(() => {
+    const task = tasks.find(item => item.id === editedId) || [...tasks].reverse().find(item => item.name === editedName);
+    if (!task) return;
+    task.group = group;
+    persist();
+    render();
+  }, 0);
+});
+
+$('#groupTasksBtn').onclick = () => {
+  const grouped = tasks.filter(task => task.group).sort((a, b) => a.group.localeCompare(b.group) || a.order - b.order);
+  const ungrouped = tasks.filter(task => !task.group);
+  tasks = [...grouped, ...ungrouped];
+  tasks.forEach((task, index) => task.order = index);
+  persist();
+  render();
+  toast('Les tâches ont été rapprochées par groupe');
+};
+
+persist();
+render();
+
+  </script>
+  <script type="text/x-rdpilot-app">
+function cascadeDependencies() {
+  let changed = false;
+  let pass = 0;
+
+  do {
+    changed = false;
+    pass += 1;
+    tasks.forEach(task => {
+      if (!task.dep) return;
+      const predecessor = tasks.find(item => item.id == task.dep);
+      if (!predecessor || predecessor.id === task.id) return;
+
+      const duration = Math.max(0, Math.round((parse(task.end) - parse(task.start)) / DAY));
+      const expectedStart = datePlusDays(predecessor.end, 1);
+      const expectedEnd = datePlusDays(expectedStart, duration);
+
+      if (task.start !== expectedStart || task.end !== expectedEnd) {
+        task.start = expectedStart;
+        task.end = expectedEnd;
+        changed = true;
+      }
+    });
+  } while (changed && pass <= tasks.length);
+
+  return pass <= tasks.length;
+}
+
+const persistDependenciesBase = persist;
+persist = function () {
+  cascadeDependencies();
+  persistDependenciesBase();
+};
+
+const renderGanttDependenciesBase = renderGantt;
+renderGantt = function () {
+  renderGanttDependenciesBase();
+  $$('.task-cell[data-id]').forEach(cell => {
+    const task = tasks.find(item => item.id == cell.dataset.id);
+    if (!task?.dep) return;
+    const predecessor = tasks.find(item => item.id == task.dep);
+    if (!predecessor) return;
+    cell.querySelector('.task-meta').insertAdjacentHTML(
+      'beforeend',
+      `<span class="dependency-chip" title="Début automatique après ${predecessor.name}">↳ après ${predecessor.name}</span>`
+    );
+    const bar = cell.parentElement.querySelector('.bar[data-id]');
+    if (bar) {
+      bar.classList.add('dependency-driven');
+      bar.title = `Date pilotée par la fin de : ${predecessor.name}`;
+    }
+  });
+};
+
+cascadeDependencies();
+persistDependenciesBase();
+render();
+
+  </script>
+  <script type="text/x-rdpilot-app">
+tasks.forEach(task => {
+  task.durationDays ||= Math.max(1, Math.round((parse(task.end) - parse(task.start)) / DAY) + 1);
+});
+
+cascadeDependencies = function () {
+  let changed = false;
+  let pass = 0;
+  do {
+    changed = false;
+    pass += 1;
+    tasks.forEach(task => {
+      task.durationDays = Math.max(1, Number(task.durationDays) || 1);
+      if (!task.dep) return;
+      const predecessor = tasks.find(item => item.id == task.dep);
+      if (!predecessor || predecessor.id === task.id) return;
+      const expectedStart = datePlusDays(predecessor.end, 1 + Math.max(0, Number(task.lagDays) || 0));
+      const expectedEnd = datePlusDays(expectedStart, task.durationDays - 1);
+      if (task.start !== expectedStart || task.end !== expectedEnd) {
+        task.start = expectedStart;
+        task.end = expectedEnd;
+        changed = true;
+      }
+    });
+  } while (changed && pass <= tasks.length);
+  return pass <= tasks.length;
+};
+
+const openTaskDurationBase = openTask;
+openTask = function (id, preset) {
+  openTaskDurationBase(id, preset);
+  const task = tasks.find(item => item.id === id);
+  $('#taskDuration').value = task?.durationDays || 5;
+};
+
+const renderGanttDurationBase = renderGantt;
+renderGantt = function () {
+  renderGanttDurationBase();
+  $$('.task-cell[data-id]').forEach(cell => {
+    const task = tasks.find(item => item.id == cell.dataset.id);
+    if (!task) return;
+    cell.querySelector('.task-meta').insertAdjacentHTML(
+      'beforeend',
+      `<span class="duration-chip">${task.durationDays} j</span>`
+    );
+  });
+};
+
+$('#taskForm').addEventListener('submit', () => {
+  const dependencyId = +$('#taskDependency').value || '';
+  const durationDays = Math.max(1, +$('#taskDuration').value || 1);
+  const predecessor = tasks.find(item => item.id == dependencyId);
+  const calculatedStart = predecessor ? datePlusDays(predecessor.end, 1) : ($('#taskStart').value || config.sprintStart);
+  $('#taskStart').value = calculatedStart;
+  $('#taskEnd').value = datePlusDays(calculatedStart, durationDays - 1);
+
+  const editedId = +$('#taskId').value;
+  const editedName = $('#taskName').value;
+  setTimeout(() => {
+    const task = tasks.find(item => item.id === editedId) || [...tasks].reverse().find(item => item.name === editedName);
+    if (!task) return;
+    task.durationDays = durationDays;
+    if (!task.dep && !editedId) task.start = config.sprintStart;
+    task.end = datePlusDays(task.start, durationDays - 1);
+    persist();
+    render();
+  }, 0);
+}, true);
+
+cascadeDependencies();
+persist();
+render();
+
+  </script>
+  <script type="text/x-rdpilot-app">
+team.forEach(member => member.capacity = 100);
+tasks.forEach(task => {
+  const assignees = task.assignees || [task.owner].filter(Boolean);
+  if (!task.allocations) {
+    const legacyPercent = Math.max(5, Math.min(100, Math.round((task.hours || 16) / 35 * 100)));
+    task.allocations = Object.fromEntries(assignees.map(personId => [personId, legacyPercent]));
+  }
+});
+
+loadFor = function (personId) {
+  return tasks
+    .filter(task => task.progress < 100)
+    .reduce((total, task) => total + Number(task.allocations?.[personId] || 0), 0);
+};
+
+function selectedAssigneeIds() {
+  return [...$('#taskOwner').selectedOptions].map(option => option.value);
+}
+
+function renderAllocationEditor(task) {
+  const selected = selectedAssigneeIds();
+  const previous = task?.allocations || {};
+  $('#allocationEditor').innerHTML = selected.length
+    ? selected.map(personId => {
+        const member = person(personId);
+        const value = previous[personId] ?? 50;
+        return `<label class="allocation-row" data-person="${personId}">
+          <span><i class="avatar" style="background:${member.color}">${member.initials}</i>${member.name}</span>
+          <input type="range" min="0" max="100" step="5" value="${value}">
+          <input class="allocation-number" type="number" min="0" max="100" step="5" value="${value}" aria-label="Allocation de ${member.name}"><b>%</b>
+        </label>`;
+      }).join('')
+    : '<p class="allocation-empty">Sélectionnez au moins une personne.</p>';
+
+  $$('.allocation-row').forEach(row => {
+    const range = row.querySelector('input[type="range"]');
+    const number = row.querySelector('.allocation-number');
+    range.oninput = () => number.value = range.value;
+    number.oninput = () => range.value = Math.max(0, Math.min(100, +number.value || 0));
+  });
+}
+
+const openTaskAllocationBase = openTask;
+openTask = function (id, preset) {
+  openTaskAllocationBase(id, preset);
+  renderAllocationEditor(tasks.find(item => item.id === id));
+};
+
+$('#taskOwner').addEventListener('change', () => {
+  const task = tasks.find(item => item.id === +$('#taskId').value);
+  renderAllocationEditor(task);
+});
+
+const renderTeamAllocationBase = renderTeam;
+renderTeam = function () {
+  renderTeamAllocationBase();
+  $$('#teamMini .mini-row').forEach(row => {
+    const name = row.querySelector('span')?.textContent;
+    const member = team.find(item => item.name === name);
+    const value = row.querySelector('small');
+    if (member && value) value.textContent = `${loadFor(member.id)}%`;
+  });
+};
+
+const renderGanttAllocationBase = renderGantt;
+renderGantt = function () {
+  renderGanttAllocationBase();
+  $$('.task-cell[data-id]').forEach(cell => {
+    const task = tasks.find(item => item.id == cell.dataset.id);
+    if (!task) return;
+    const meta = cell.querySelector('.task-meta');
+    [...meta.children].forEach(item => {
+      if (item.textContent.includes('h/sem.')) item.remove();
+    });
+    const total = Object.values(task.allocations || {}).reduce((sum, value) => sum + Number(value), 0);
+    meta.insertAdjacentHTML('beforeend', `<span class="allocation-chip">Σ ${total}%</span>`);
+  });
+};
+
+const renderSettingsAllocationBase = renderSettings;
+renderSettings = function () {
+  renderSettingsAllocationBase();
+  $$('.p-cap').forEach(input => {
+    input.max = 100;
+    input.min = 0;
+    input.title = 'Disponibilité maximale en pourcentage';
+    input.setAttribute('aria-label', 'Disponibilité maximale en pourcentage');
+  });
+};
+
+$('#taskForm').addEventListener('submit', () => {
+  const editedId = +$('#taskId').value;
+  const editedName = $('#taskName').value;
+  const allocations = Object.fromEntries($$('.allocation-row').map(row => [
+    row.dataset.person,
+    Math.max(0, Math.min(100, +row.querySelector('.allocation-number').value || 0))
+  ]));
+  setTimeout(() => {
+    const task = tasks.find(item => item.id === editedId) || [...tasks].reverse().find(item => item.name === editedName);
+    if (!task) return;
+    task.allocations = allocations;
+    task.assignees = Object.keys(allocations);
+    task.owner = task.assignees[0] || '';
+    persist();
+    render();
+  }, 0);
+}, true);
+
+persist();
+render();
+
+  </script>
+  <script type="text/x-rdpilot-app">
+tasks.forEach(task => {
+  task.lagDays ??= 0;
+});
+
+const renderGanttMilestoneDragBase = renderGantt;
+renderGantt = function () {
+  renderGanttMilestoneDragBase();
+
+  $$('.milestone[data-id]').forEach(milestone => {
+    const task = tasks.find(item => item.id == milestone.dataset.id);
+    if (!task) return;
+
+    const predecessor = task.dep && tasks.find(item => item.id == task.dep);
+    milestone.title = predecessor
+      ? `Glissez pour régler le délai après « ${predecessor.name} »`
+      : 'Glissez horizontalement pour déplacer la décision';
+    milestone.onclick = event => event.stopPropagation();
+    milestone.draggable = false;
+
+    if (predecessor && Number(task.lagDays) > 0) {
+      const meta = milestone.closest('.gantt-row')?.querySelector('.task-meta');
+      meta?.insertAdjacentHTML(
+        'beforeend',
+        `<span class="lag-chip">+${task.lagDays} j après dépendance</span>`
+      );
+    }
+
+    milestone.addEventListener('pointerdown', event => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+
+      const timeline = milestone.closest('.timeline-row');
+      const pixelsPerDay = timeline.clientWidth / bounds().total;
+      const startX = event.clientX;
+      const originalStart = task.start;
+      const originalEnd = task.end;
+      const originalLag = Math.max(0, Number(task.lagDays) || 0);
+      let movedDays = 0;
+
+      milestone.setPointerCapture(event.pointerId);
+      milestone.classList.add('moving');
+
+      const move = moveEvent => {
+        const rawDays = Math.round((moveEvent.clientX - startX) / pixelsPerDay);
+        movedDays = predecessor ? Math.max(-originalLag, rawDays) : rawDays;
+        milestone.style.transform = `translateX(${movedDays * pixelsPerDay}px) rotate(45deg)`;
+      };
+
+      const finish = finishEvent => {
+        if (milestone.hasPointerCapture(finishEvent.pointerId)) {
+          milestone.releasePointerCapture(finishEvent.pointerId);
+        }
+        milestone.removeEventListener('pointermove', move);
+        milestone.removeEventListener('pointerup', finish);
+        milestone.removeEventListener('pointercancel', finish);
+        milestone.classList.remove('moving');
+
+        if (!movedDays) {
+          milestone.style.transform = '';
+          if (finishEvent.type === 'pointerup') openTask(task.id);
+          return;
+        }
+
+        if (predecessor) {
+          task.lagDays = originalLag + movedDays;
+        } else {
+          task.start = datePlusDays(originalStart, movedDays);
+          task.end = datePlusDays(originalEnd, movedDays);
+        }
+        persist();
+        render();
+        toast(predecessor
+          ? `Décision positionnée ${task.lagDays} jour${task.lagDays > 1 ? 's' : ''} après la dépendance`
+          : `Décision décalée de ${movedDays} jour${Math.abs(movedDays) > 1 ? 's' : ''}`
+        );
+      };
+
+      milestone.addEventListener('pointermove', move);
+      milestone.addEventListener('pointerup', finish);
+      milestone.addEventListener('pointercancel', finish);
+    });
+  });
+};
+
+persist();
+render();
+
+  </script>
+  <script type="text/x-rdpilot-app">
+let skillCatalog = JSON.parse(localStorage.getItem('rdpilot.skillCatalog') || 'null') || [];
+
+function skillKey(skill) {
+  return skill.trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+
+function deduplicateSkills(values) {
+  const unique = new Map();
+  values.map(skill => String(skill).trim()).filter(Boolean).forEach(skill => {
+    const key = skillKey(skill);
+    if (!unique.has(key)) unique.set(key, skill);
+  });
+  return [...unique.values()];
+}
+
+function cleanSkillData() {
+  skillCatalog = deduplicateSkills(skillCatalog);
+  team.forEach(member => member.skills = deduplicateSkills(member.skills || []));
+  tasks.forEach(task => task.skills = deduplicateSkills(task.skills || []));
+  localStorage.setItem('rdpilot.skillCatalog', JSON.stringify(skillCatalog));
+}
+
+function allSkills() {
+  return deduplicateSkills([
+    ...skillCatalog,
+    ...team.flatMap(member => member.skills || []),
+    ...tasks.flatMap(task => task.skills || [])
+  ]).sort((a, b) => a.localeCompare(b, 'fr'));
+}
+
+function escapeSkill(value) {
+  return value.replace(/[&<>"']/g, character => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+  })[character]);
+}
+
+function chosenSkills() {
+  return [...$('#taskSkills').selectedOptions].map(option => option.value);
+}
+
+function fillSkillSelector(selected = []) {
+  const selectedSet = new Set(selected);
+  $('#taskSkills').innerHTML = allSkills().map(skill =>
+    `<option value="${escapeSkill(skill)}" ${selectedSet.has(skill) ? 'selected' : ''}>${escapeSkill(skill)}</option>`
+  ).join('');
+}
+
+function updateSkillMatch() {
+  const skills = chosenSkills().map(skill => skill.toLowerCase());
+  const ranked = team.map(member => ({
+    member,
+    score: skills.filter(skill => member.skills.some(item => item.toLowerCase() === skill)).length,
+    load: loadFor(member.id) / member.capacity
+  })).sort((a, b) => b.score - a.score || a.load - b.load);
+  const best = ranked[0];
+  $('#matchBox').innerHTML = !best
+    ? 'Ajoutez un membre dans les paramètres.'
+    : skills.length
+      ? `Meilleur profil disponible : <strong>${best.member.name}</strong> · ${best.score}/${skills.length} compétences · charge ${Math.round(best.load * 100)}%`
+      : 'Sélectionnez des compétences pour obtenir une suggestion.';
+}
+
+const openTaskSkillsBase = openTask;
+openTask = function (id, preset) {
+  openTaskSkillsBase(id, preset);
+  const task = tasks.find(item => item.id === id);
+  fillSkillSelector(task?.skills || (preset === 'supply' ? ['Supply'] : []));
+  $('#taskSkills').onchange = updateSkillMatch;
+  updateSkillMatch();
+};
+
+const renderSettingsSkillsBase = renderSettings;
+renderSettings = function () {
+  cleanSkillData();
+  renderSettingsSkillsBase();
+  const panel = $('#skillCatalogPanel');
+  panel.innerHTML = `
+    <p class="eyebrow">RÉFÉRENTIEL</p><h2>Compétences</h2>
+    <p class="settings-note">Ajoutez ici les compétences proposées lors de la création d’une tâche.</p>
+    <div class="skill-catalog-form">
+      <input id="newSkillName" placeholder="Ex. Compatibilité électromagnétique" aria-label="Nouvelle compétence">
+      <button class="btn primary" type="button" id="addSkillBtn">＋ Ajouter</button>
+    </div>
+    <div class="skill-catalog-list">${allSkills().map(skill => `<span class="skill-catalog-chip">${escapeSkill(skill)}</span>`).join('')}</div>`;
+
+  const addSkill = () => {
+    const value = $('#newSkillName').value.trim();
+    if (!value) return;
+    if (allSkills().some(skill => skillKey(skill) === skillKey(value))) {
+      return toast('Cette compétence existe déjà');
+    }
+    skillCatalog.push(value);
+    localStorage.setItem('rdpilot.skillCatalog', JSON.stringify(skillCatalog));
+    renderSettings();
+    toast('Compétence ajoutée');
+  };
+  $('#addSkillBtn').onclick = addSkill;
+  $('#newSkillName').onkeydown = event => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      addSkill();
+    }
+  };
+};
+
+$('#taskForm').addEventListener('submit', () => {
+  const editedId = +$('#taskId').value;
+  const editedName = $('#taskName').value;
+  const skills = chosenSkills();
+  setTimeout(() => {
+    const task = tasks.find(item => item.id === editedId) || [...tasks].reverse().find(item => item.name === editedName);
+    if (!task) return;
+    task.skills = skills;
+    persist();
+    render();
+  }, 0);
+}, true);
+
+cleanSkillData();
+persist();
+render();
+
+  </script>
+  <script type="text/x-rdpilot-app">
+function weeklyLoad(memberId, weekStart) {
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekEnd.getDate() + 6);
+  return tasks.reduce((sum, task) => {
+    const overlaps = parse(task.start) <= weekEnd && parse(task.end) >= weekStart;
+    return overlaps ? sum + Number(task.allocations?.[memberId] || 0) : sum;
+  }, 0);
+}
+
+function loadWeeks() {
+  const weeks = [];
+  const current = parse(config.sprintStart || '2026-09-14');
+  const finish = parse('2026-12-31');
+  while (current <= finish) {
+    weeks.push(new Date(current));
+    current.setDate(current.getDate() + 7);
+  }
+  return weeks;
+}
+
+function renderWeeklyLoadChart() {
+  const container = $('#weeklyLoadChart');
+  if (!container) return;
+  const weeks = loadWeeks();
+  const data = team.map(member => ({
+    member,
+    values: weeks.map(week => weeklyLoad(member.id, week))
+  }));
+  const peak = Math.max(100, ...data.flatMap(series => series.values), ...team.map(member => Number(member.capacity) || 100));
+  const chartMax = Math.ceil((peak + 20) / 25) * 25;
+  const width = 1000;
+  const height = 310;
+  const margin = { left: 48, right: 18, top: 15, bottom: 48 };
+  const plotWidth = width - margin.left - margin.right;
+  const plotHeight = height - margin.top - margin.bottom;
+  const x = index => margin.left + index * plotWidth / Math.max(1, weeks.length - 1);
+  const y = value => margin.top + plotHeight - value / chartMax * plotHeight;
+  const gridValues = Array.from({ length: Math.floor(chartMax / 25) + 1 }, (_, index) => index * 25);
+
+  const grid = gridValues.map(value => `
+    <line x1="${margin.left}" y1="${y(value)}" x2="${width - margin.right}" y2="${y(value)}" stroke="#e5e9ef" stroke-width="1" />
+    <text x="${margin.left - 8}" y="${y(value) + 4}" text-anchor="end" fill="#7a8495" font-size="11">${value}%</text>
+  `).join('');
+
+  const labels = weeks.map((week, index) => index % 2 === 0 || index === weeks.length - 1 ? `
+    <text x="${x(index)}" y="${height - 20}" text-anchor="middle" fill="#7a8495" font-size="11">${week.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}</text>
+  ` : '').join('');
+
+  const series = data.map(({ member, values }) => {
+    const points = values.map((value, index) => `${x(index)},${y(value)}`).join(' ');
+    const dots = values.map((value, index) => `
+      <circle cx="${x(index)}" cy="${y(value)}" r="${value > member.capacity ? 5 : 3}" fill="${value > member.capacity ? '#e14f5d' : member.color}" stroke="white" stroke-width="2">
+        <title>${member.name} · semaine du ${weeks[index].toLocaleDateString('fr-FR')} · ${value}%${value > member.capacity ? ' — surcharge' : ''}</title>
+      </circle>
+    `).join('');
+    return `<polyline points="${points}" fill="none" stroke="${member.color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" />${dots}`;
+  }).join('');
+
+  container.innerHTML = `
+    <div class="load-chart-legend">
+      ${team.map(member => `<span><i style="background:${member.color}"></i>${member.name} · disponibilité ${member.capacity}%</span>`).join('')}
+      <span><i style="background:#e14f5d"></i>Surcharge</span>
+    </div>
+    <div class="load-chart-wrap">
+      <svg class="load-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="Charge hebdomadaire par personne">
+        ${grid}${labels}${series}
+      </svg>
+    </div>
+    <p class="load-chart-note">La charge additionne les allocations des tâches actives pendant chaque semaine. Les points rouges dépassent la disponibilité de la personne.</p>`;
+}
+
+const renderCapacityWorkloadBase = renderCapacity;
+renderCapacity = function () {
+  renderCapacityWorkloadBase();
+  renderWeeklyLoadChart();
+};
+
+renderWeeklyLoadChart();
+
+  </script>
+  <script type="text/x-rdpilot-app">
+showBaseline = false;
+
+renderKpis = function () {
+  const progress = tasks.length
+    ? Math.round(tasks.reduce((total, task) => total + task.progress, 0) / tasks.length)
+    : 0;
+  const overload = team.filter(member => loadFor(member.id) > member.capacity).length;
+  const trl = tasks.filter(task => task.milestone && task.progress === 100).length + 3;
+  const indicators = [
+    ['Avancement global', `${progress}%`, 'pondération simple'],
+    ['Charge critique', overload, overload ? 'membre(s) surchargé(s)' : 'capacité disponible'],
+    ['Niveau actuel', `TRL ${trl}`, 'objectif : TRL 5']
+  ];
+  $('#kpis').innerHTML = indicators.map(indicator => `
+    <div class="kpi">
+      <div class="kpi-label">${indicator[0]}</div>
+      <div class="kpi-value">${indicator[1]}</div>
+      <div class="kpi-note">${indicator[2]}</div>
+    </div>
+  `).join('');
+};
+
+renderKpis();
+renderGantt();
+
+  </script>
+  <script type="text/x-rdpilot-app">
+const SPEC_STATUSES = ['Validé', 'En cours de validation', 'Dégradé', 'Enlevé'];
+const SPEC_SECTIONS = Array.isArray(window.RDP_SPEC_CATALOG) ? window.RDP_SPEC_CATALOG : [];
+
+let specStatuses = JSON.parse(localStorage.getItem('rdpilot.specStatuses') || '{}');
+
+function escapeSpec(value) {
+  return String(value).replace(/[&<>"']/g, character => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+  })[character]);
+}
+
+function statusClass(status) {
+  return {
+    'Validé': 'status-valide',
+    'En cours de validation': 'status-en-cours',
+    'Dégradé': 'status-degrade',
+    'Enlevé': 'status-enleve'
+  }[status] || 'status-en-cours';
+}
+
+function renderSpecs() {
+  const filter = $('#specStatusFilter')?.value || 'all';
+  const allItems = SPEC_SECTIONS.flatMap(section => section.items);
+  const counts = Object.fromEntries(SPEC_STATUSES.map(status => [status, 0]));
+  allItems.forEach(item => counts[specStatuses[item[0]] || 'En cours de validation'] += 1);
+
+  $('#specSummary').innerHTML = SPEC_STATUSES.map(status => `
+    <div class="spec-summary-card">
+      <span>${status}</span><strong>${counts[status]}</strong>
+    </div>
+  `).join('');
+
+  $('#specTables').innerHTML = SPEC_SECTIONS.map(section => {
+    const visible = section.items.filter(item => filter === 'all' || (specStatuses[item[0]] || 'En cours de validation') === filter);
+    if (!visible.length) return '';
+    return `<article class="spec-section">
+      <h3>${escapeSpec(section.title)} · ${visible.length} critère${visible.length > 1 ? 's' : ''}</h3>
+      <div class="spec-table-wrap"><table class="spec-table">
+        <thead><tr><th>Critère</th><th>Valeur cible</th><th>Notes</th><th>État</th></tr></thead>
+        <tbody>${visible.map(item => {
+          const current = specStatuses[item[0]] || 'En cours de validation';
+          return `<tr>
+            <td>${escapeSpec(item[1])}</td><td>${escapeSpec(item[2])}</td><td>${escapeSpec(item[3])}</td>
+            <td><select class="spec-status ${statusClass(current)}" data-spec-id="${item[0]}" aria-label="État de ${escapeSpec(item[1])}">
+              ${SPEC_STATUSES.map(status => `<option ${status === current ? 'selected' : ''}>${status}</option>`).join('')}
+            </select></td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table></div>
+    </article>`;
+  }).join('');
+
+  $$('.spec-status').forEach(selector => selector.onchange = () => {
+    specStatuses[selector.dataset.specId] = selector.value;
+    localStorage.setItem('rdpilot.specStatuses', JSON.stringify(specStatuses));
+    renderSpecs();
+    toast('État de la spécification mis à jour');
+  });
+}
+
+$$('.nav-item').forEach(button => button.onclick = () => {
+  $$('.nav-item').forEach(item => item.classList.toggle('active', item === button));
+  ['planning', 'capacity', 'specs', 'settings'].forEach(view => {
+    const section = $(`#${view}View`);
+    if (section) section.hidden = view !== button.dataset.view;
+  });
+  $('#viewTitle').textContent = {
+    planning: 'Planning R&D',
+    capacity: 'Charge & compétences',
+    specs: 'Spécifications produit',
+    settings: 'Paramètres'
+  }[button.dataset.view];
+  const planningActions = button.dataset.view === 'planning';
+  $('#todayBtn').hidden = !planningActions;
+  $('#groupTasksBtn').hidden = !planningActions;
+  $('#addTaskBtn').hidden = !planningActions;
+  if (button.dataset.view === 'specs') renderSpecs();
+});
+
+$('#specStatusFilter').onchange = renderSpecs;
+renderSpecs();
+
+  </script>
+  <script type="text/x-rdpilot-app">
+function planningExportPayload() {
+  return {
+    format: 'rdpilot-data',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    team,
+    tasks,
+    config,
+    skillCatalog: JSON.parse(localStorage.getItem('rdpilot.skillCatalog') || '[]'),
+    specStatuses: JSON.parse(localStorage.getItem('rdpilot.specStatuses') || '{}')
+  };
+}
+
+function rdExportFallback(payload, reason) {
+  let dlg = document.getElementById('exportFallback');
+  if (!dlg) {
+    dlg = document.createElement('dialog');
+    dlg.id = 'exportFallback';
+    dlg.innerHTML = `<form method="dialog" style="padding:23px">
+      <div class="dialog-head"><div><p class="eyebrow">EXPORT MANUEL</p><h2>Copier les données du planning</h2></div><button class="icon-btn" type="button" data-close-dialog aria-label="Fermer">×</button></div>
+      <p class="settings-note" id="exportFallbackReason" style="margin:0 0 12px"></p>
+      <textarea id="exportFallbackText" readonly style="width:100%;height:260px;font:12px ui-monospace,Menlo,monospace;border:1px solid var(--line);border-radius:8px;padding:10px"></textarea>
+      <div class="dialog-actions" style="margin-top:12px"><span></span><button class="btn ghost" value="cancel">Fermer</button><button class="btn primary" type="button" id="exportFallbackCopy">Copier</button></div>
+    </form>`;
+    document.body.appendChild(dlg);
+    dlg.querySelector('#exportFallbackCopy').onclick = async () => {
+      const area = dlg.querySelector('#exportFallbackText');
+      area.focus(); area.select();
+      let ok = false;
+      try { await navigator.clipboard.writeText(area.value); ok = true; } catch (e) {
+        try { ok = document.execCommand('copy'); } catch (_) {}
+      }
+      toast(ok ? 'Données copiées dans le presse-papiers' : 'Sélectionnez le texte puis Ctrl+C / ⌘+C');
+    };
+  }
+  dlg.querySelector('#exportFallbackReason').textContent = (reason ? reason + ' ' : '') + 'Copiez ce texte et collez-le dans un fichier .json (ou directement dans la conversation avec Claude).';
+  dlg.querySelector('#exportFallbackText').value = payload;
+  dlg.showModal();
+}
+
+async function rdGetDownloads() {
+  try {
+    if (window.claude && typeof window.claude.use === 'function') return await window.claude.use('downloads');
+  } catch (e) {}
+  return null;
+}
+
+$('#exportDataBtn').onclick = async () => {
+  const button = $('#exportDataBtn');
+  const payload = JSON.stringify(planningExportPayload(), null, 2);
+  const filename = `RD_Pilot_donnees_${new Date().toLocaleDateString('sv-SE')}.json`;
+  if (window.claude && typeof window.claude.use === 'function') {
+    button.disabled = true;
+    toast('Préparation de l’export…');
+    const downloads = await rdGetDownloads();
+    button.disabled = false;
+    if (!downloads) {
+      rdExportFallback(payload, 'Le téléchargement direct n’est pas disponible ici.');
+      return;
+    }
+    try {
+      await downloads.save({ filename, data: payload });
+      toast('Données du planning exportées');
+    } catch (err) {
+      if (err && err.code === 'declined') { toast('Export annulé'); return; }
+      rdExportFallback(payload, `Le téléchargement a échoué (${(err && err.code) || 'erreur inconnue'}).`);
+    }
+    return;
+  }
+  const blob = new Blob([payload], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  toast('Données du planning exportées');
+};
+
+
+  </script>
+  <script type="text/x-rdpilot-app">
+(function () {
+  const panel = $('#decisionChecklist');
+  const rows = $('#decisionChecklistRows');
+  const addButton = $('#addChecklistItem');
+
+  function escapeHtml(value) {
+    return String(value || '').replace(/[&<>'"]/g, character => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+    })[character]);
+  }
+
+  function addRow(item = {}) {
+    const row = document.createElement('div');
+    row.className = 'decision-check-row';
+    row.innerHTML = `
+      <input class="decision-check" type="checkbox" aria-label="Critère validé" ${item.done ? 'checked' : ''}>
+      <input class="decision-check-label" type="text" value="${escapeHtml(item.label)}" placeholder="Critère de validation…" aria-label="Critère de validation">
+      <button class="icon-btn decision-check-remove" type="button" aria-label="Supprimer ce critère">×</button>`;
+    row.querySelector('.decision-check-remove').onclick = () => {
+      row.remove();
+      if (!rows.children.length) addRow();
+    };
+    rows.appendChild(row);
+  }
+
+  function checklistFromForm() {
+    return $$('.decision-check-row', rows).map(row => ({
+      label: row.querySelector('.decision-check-label').value.trim(),
+      done: row.querySelector('.decision-check').checked
+    })).filter(item => item.label);
+  }
+
+  function syncChecklistVisibility() {
+    const isDecision = $('#taskType').value === 'decision';
+    panel.hidden = !isDecision;
+    $$('.decision-optional').forEach(field => field.classList.toggle('decision-hidden', isDecision));
+    if (isDecision && !rows.children.length) addRow();
+  }
+
+  const openTaskBase = openTask;
+  openTask = function (id, preset) {
+    openTaskBase(id, preset);
+    const task = tasks.find(item => item.id === id);
+    rows.innerHTML = '';
+    const checklist = Array.isArray(task?.decisionChecklist) ? task.decisionChecklist : [];
+    (checklist.length ? checklist : [{}]).forEach(addRow);
+    syncChecklistVisibility();
+  };
+
+  const syncTypeBase = syncType;
+  syncType = function () {
+    syncTypeBase();
+    syncChecklistVisibility();
+  };
+  $('#taskType').onchange = syncType;
+  addButton.onclick = () => addRow();
+
+  $('#taskForm').addEventListener('submit', () => {
+    if ($('#taskType').value !== 'decision') return;
+    const editedId = +$('#taskId').value;
+    const editedName = $('#taskName').value;
+    const checklist = checklistFromForm();
+    const validated = checklist.length > 0 && checklist.every(item => item.done);
+    $('#taskProgress').value = validated ? 100 : 0;
+    setTimeout(() => {
+      const task = tasks.find(item => item.id === editedId) || [...tasks].reverse().find(item => item.name === editedName);
+      if (!task) return;
+      task.decisionChecklist = checklist;
+      task.progress = validated ? 100 : 0;
+      persist();
+      render();
+    }, 0);
+  }, true);
+
+  const renderGanttBase = renderGantt;
+  renderGantt = function () {
+    renderGanttBase();
+    $$('.task-cell[data-id]').forEach(cell => {
+      const task = tasks.find(item => item.id == cell.dataset.id);
+      if (!task || task.type !== 'decision') return;
+      const checklist = Array.isArray(task.decisionChecklist) ? task.decisionChecklist : [];
+      const completed = checklist.filter(item => item.done).length;
+      const chip = document.createElement('span');
+      chip.className = 'checklist-chip';
+      chip.textContent = checklist.length ? `☑ ${completed}/${checklist.length}` : '☐ Checklist';
+      cell.querySelector('.task-meta')?.appendChild(chip);
+    });
+  };
+
+  render();
+})();
+
+  </script>
+  <script type="text/x-rdpilot-app">
+(function () {
+  const TEST_STATES = ['Bloqué', 'Préparable', 'Disponible', 'En cours', 'En rédaction rapport', 'Validé'];
+
+  function escapeTest(value) {
+    return String(value || '').replace(/[&<>'"]/g, character => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+    })[character]);
+  }
+
+  function isTestTask(task) {
+    return /^tests?\b/i.test(task.name.trim()) || String(task.phase).startsWith('Tests');
+  }
+
+  function testLevel(task) {
+    return task.phase === "Tests à l'échelle" ? 'scale' : 'prototype';
+  }
+
+  function stateClass(state) {
+    return state.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, '-');
+  }
+
+  function readiness(task) {
+    if (TEST_STATES.includes(task.testStatus)) {
+      return { state: task.testStatus, note: task.testStatus === 'En rédaction rapport' ? 'Essais terminés, rapport en préparation' : `Statut défini : ${task.testStatus}` };
+    }
+    if (task.progress >= 100) return { state: 'En rédaction rapport', note: 'Essais terminés, rapport à finaliser' };
+    if (task.progress > 0) return { state: 'En cours', note: `${task.progress}% réalisé` };
+
+    const predecessor = tasks.find(item => item.id == task.dep);
+    if (predecessor) {
+      if (predecessor.progress >= 100) return { state: 'Disponible', note: `${predecessor.name} terminé` };
+      if (predecessor.progress >= 50) return { state: 'Préparable', note: `${predecessor.name} à ${predecessor.progress}%` };
+      return { state: 'Bloqué', note: `Attente : ${predecessor.name} (${predecessor.progress || 0}%)` };
+    }
+
+    const developments = tasks.filter(item => !isTestTask(item) && !item.milestone && item.type !== 'supply');
+    const average = developments.length
+      ? Math.round(developments.reduce((sum, item) => sum + Number(item.progress || 0), 0) / developments.length)
+      : 0;
+    if (average >= 80) return { state: 'Disponible', note: `Développement global à ${average}%` };
+    if (average >= 40) return { state: 'Préparable', note: `Développement global à ${average}%` };
+    return { state: 'Bloqué', note: `Développement global à ${average}%` };
+  }
+
+  function renderTests() {
+    const filter = $('#testLevelFilter')?.value || 'all';
+    const tests = tasks.filter(isTestTask).map(task => ({ task, level: testLevel(task), ...readiness(task) }));
+    const visible = tests.filter(test => filter === 'all' || test.level === filter);
+    const counts = Object.fromEntries(TEST_STATES.map(state => [state, tests.filter(test => test.state === state).length]));
+
+    $('#testSummary').innerHTML = TEST_STATES.map(state => `
+      <div class="test-summary-card state-${stateClass(state)}">
+        <span>${state}</span><strong>${counts[state]}</strong>
+      </div>`).join('');
+
+    if (!visible.length) {
+      $('#testBoard').innerHTML = '<div class="panel test-empty">Aucune tâche de test n’est encore présente dans le planning pour ce niveau.</div>';
+      return;
+    }
+
+    $('#testBoard').innerHTML = visible.map(({ task, level, state, note }) => {
+      const assignees = (task.assignees || [task.owner]).map(id => person(id)?.name).filter(Boolean);
+      return `<article class="test-card">
+        <div class="test-card-top">
+          <span class="test-level ${level}">${level === 'scale' ? 'À L’ÉCHELLE' : 'PROTOTYPE'}</span>
+          <select class="test-state test-status-select state-${stateClass(state)}" data-test-id="${task.id}" aria-label="Statut de ${escapeTest(task.name)}">
+            ${TEST_STATES.map(option => `<option ${option === state ? 'selected' : ''}>${option}</option>`).join('')}
+          </select>
+        </div>
+        <h3>${escapeTest(task.name)}</h3>
+        <p class="test-condition">${escapeTest(note)}</p>
+        <div class="test-progress"><i style="width:${Math.max(0, Math.min(100, task.progress || 0))}%"></i></div>
+        <div class="test-meta"><span>${task.durationDays || 1} j</span><span>${assignees.length ? escapeTest(assignees.join(', ')) : 'Non affecté'}</span></div>
+        <button class="test-remove" type="button" data-remove-test="${task.id}">Supprimer</button>
+      </article>`;
+    }).join('');
+
+    $$('.test-status-select').forEach(selector => selector.onchange = () => {
+      const task = tasks.find(item => item.id == selector.dataset.testId);
+      if (!task) return;
+      task.testStatus = selector.value;
+      persist();
+      renderTests();
+      toast('Statut du test mis à jour');
+    });
+
+    $$('[data-remove-test]').forEach(button => button.onclick = () => {
+      const task = tasks.find(item => item.id == button.dataset.removeTest);
+      if (!task || !confirm(`Supprimer le test « ${task.name} » du planning ?`)) return;
+      tasks = tasks.filter(item => item.id !== task.id);
+      tasks.forEach(item => {
+        if (item.dep == task.id) item.dep = '';
+        if (item.trigger == task.id) item.trigger = '';
+        if (item.triggeredBy == task.id) item.triggeredBy = '';
+      });
+      persist();
+      render();
+      toast('Test supprimé du planning');
+    });
+  }
+
+  const renderBase = render;
+  render = function () {
+    renderBase();
+    renderTests();
+  };
+
+  $$('.nav-item').forEach(button => button.onclick = () => {
+    $$('.nav-item').forEach(item => item.classList.toggle('active', item === button));
+    ['planning', 'capacity', 'tests', 'specs', 'settings'].forEach(view => {
+      const section = $(`#${view}View`);
+      if (section) section.hidden = view !== button.dataset.view;
+    });
+    $('#viewTitle').textContent = {
+      planning: 'Planning R&D', capacity: 'Charge & compétences', tests: 'Tests disponibles',
+      specs: 'Spécifications produit', settings: 'Paramètres'
+    }[button.dataset.view];
+    const planningActions = button.dataset.view === 'planning';
+    $('#todayBtn').hidden = !planningActions;
+    $('#groupTasksBtn').hidden = !planningActions;
+    $('#addTaskBtn').hidden = !planningActions;
+    if (button.dataset.view === 'tests') renderTests();
+    if (button.dataset.view === 'specs') renderSpecs();
+  });
+
+  $('#testLevelFilter').onchange = renderTests;
+  $('#addTestBtn').onclick = () => {
+    openTask(null, 'development');
+    $('#dialogEyebrow').textContent = 'NOUVEAU TEST';
+    $('#dialogTitle').textContent = 'Ajouter un test au planning';
+    $('#taskName').value = 'Nouveau test';
+    $('#taskPhase').value = 'Tests prototype';
+    $('#taskTeam').value = 'Test';
+    $('#taskProgress').value = 0;
+  };
+  renderTests();
+})();
+
+  </script>
+  <script type="text/x-rdpilot-app">
+/* Jalons affichés sur la ligne d'une autre tâche + étapes clés */
+(function () {
+  const field = $('#inlineField'), box = $('#taskInline');
+  const keyField = $('#keyStepField'), keyBox = $('#taskKeyStep');
+  const hostField = $('#hostField'), hostSel = $('#taskHost');
+  const depLabel = $('#taskDependency').closest('label');
+  const trgField = $('#triggerField');
+  const trlLabel = $('#taskMilestone').closest('label');
+  let currentId = null;
+
+  const sync = () => {
+    const isDecision = $('#taskType').value === 'decision';
+    const isKey = isDecision && keyBox.checked;
+    keyField.hidden = !isDecision;
+    hostField.hidden = !isKey;
+    field.hidden = !isDecision || isKey;
+    depLabel.hidden = isKey;
+    trgField.hidden = !isDecision || isKey;
+    trlLabel.hidden = isKey;
+  };
+  $('#taskType').addEventListener('change', sync);
+  keyBox.addEventListener('change', sync);
+
+  function fillHost(selected) {
+    const opts = tasks
+      .filter(t => t.id !== currentId && !t.keyStep && !(t.milestone && t.inline))
+      .map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('');
+    hostSel.innerHTML = '<option value="">Sur sa propre ligne</option>' + opts;
+    hostSel.value = selected ? String(selected) : '';
+  }
+
+  const openTaskInlineBase = openTask;
+  openTask = function (id, preset) {
+    openTaskInlineBase(id, preset);
+    const task = tasks.find(item => item.id === id);
+    currentId = task ? task.id : null;
+    box.checked = !!task?.inline;
+    keyBox.checked = !!task?.keyStep;
+    fillHost(task?.hostId);
+    sync();
+  };
+
+  $('#taskForm').addEventListener('submit', () => {
+    const editedId = +$('#taskId').value;
+    const editedName = $('#taskName').value;
+    const isDecision = $('#taskType').value === 'decision';
+    const keyStep = keyBox.checked && isDecision;
+    const inline = box.checked && isDecision && !keyStep;
+    const hostId = keyStep ? (+hostSel.value || '') : '';
+    if (keyStep) { $('#taskDependency').value = ''; $('#taskTrigger').value = ''; $('#taskMilestone').checked = true; }
+    setTimeout(() => {
+      const task = tasks.find(item => item.id === editedId) || [...tasks].reverse().find(item => item.name === editedName);
+      if (!task) return;
+      if (inline) task.inline = true; else delete task.inline;
+      if (keyStep) { task.keyStep = true; task.dep = ''; task.trigger = ''; } else delete task.keyStep;
+      if (hostId) task.hostId = hostId; else delete task.hostId;
+      persist();
+      render();
+    }, 0);
+  }, true);
+
+  function esc(v) { return String(v || '').replace(/[&<>'"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[c]); }
+
+  document.addEventListener('click', event => {
+    const btn = event.target.closest('[data-close-dialog]');
+    if (btn) { event.preventDefault(); btn.closest('dialog')?.close(); }
+  });
+
+  $('#addKeyStepBtn').onclick = () => {
+    openTask(null, 'decision');
+    keyBox.checked = true;
+    sync();
+    $('#dialogEyebrow').textContent = 'NOUVELLE ÉTAPE CLÉ';
+    $('#dialogTitle').textContent = 'Ajouter une étape clé';
+    $('#taskName').placeholder = 'Ex. Paillasse prête';
+  };
+
+  const renderSettingsKeyBase = renderSettings;
+  renderSettings = function () {
+    renderSettingsKeyBase();
+    tasks.filter(t => t.keyStep).forEach(t => {
+      const badge = $(`.task-setting[data-task="${t.id}"] .type-badge`);
+      if (badge) { badge.className = 'type-badge keystep'; badge.textContent = 'ÉTAPE CLÉ'; }
+    });
+  };
+
+  // Une étape clé rattachée à une ligne prend la date de début de cette tâche.
+  function alignHosted() {
+    let changed = false;
+    tasks.filter(t => t.keyStep && t.hostId).forEach(t => {
+      const host = tasks.find(x => x.id == t.hostId);
+      if (!host) return;
+      if (t.start !== host.start || t.end !== host.start) { t.start = host.start; t.end = host.start; changed = true; }
+    });
+    if (changed) persist();
+  }
+
+  const renderGanttInlineBase = renderGantt;
+  renderGantt = function () {
+    alignHosted();
+    renderGanttInlineBase();
+    tasks.filter(t => t.keyStep).forEach(t => {
+      const d = $(`.milestone[data-id="${t.id}"]`);
+      if (d) d.classList.add('keystep');
+      const tag = $(`.task-cell[data-id="${t.id}"] .decision-tag`);
+      if (tag) { tag.textContent = 'Étape clé'; tag.style.color = '#0e7490'; }
+    });
+    let hidden = 0;
+    tasks.filter(t => t.milestone && ((t.keyStep && t.hostId) || t.inline)).forEach(jalon => {
+      const host = jalon.keyStep && jalon.hostId
+        ? tasks.find(t => t.id == jalon.hostId)
+        : tasks.find(t => t.dep == jalon.id && !t.inline);
+      if (!host) return;
+      const hostCell = $(`.task-cell[data-id="${host.id}"]`);
+      const ownCell = $(`.task-cell[data-id="${jalon.id}"]`);
+      const diamond = $(`.milestone[data-id="${jalon.id}"]`);
+      const hostRow = hostCell?.closest('.gantt-row');
+      const ownRow = ownCell?.closest('.gantt-row');
+      const hostTimeline = hostRow?.querySelector('.timeline-row');
+      if (!hostTimeline || !ownRow || !diamond) return;
+      diamond.classList.add('inline-milestone');
+      diamond.title = `${jalon.name} · cliquez pour ouvrir`;
+      hostTimeline.appendChild(diamond);
+      ownRow.remove();
+      hidden += 1;
+    });
+    const count = $('#taskCount');
+    if (hidden && count) count.textContent = count.textContent.replace(/\d+/, n => String(Math.max(0, +n - hidden)));
+  };
+
+  render();
+})();
+  </script>
+
+
+<div class="rdp-overlay" id="rdpOverlay"><div class="rdp-card"><span class="rdp-mark">R</span><h1>R&amp;D Pilot</h1><p>Chargement…</p><div class="rdp-spin"></div></div></div>
+<dialog id="rdpModal"><form method="dialog"><div class="dialog-head"><div><p class="eyebrow" id="rdpModalEyebrow"></p><h2 id="rdpModalTitle"></h2></div></div><div class="rdp-modal-text" id="rdpModalText"></div><div class="dialog-actions" id="rdpModalActions"></div></form></dialog>
+<script>
+/* =====================================================================
+   R&D Pilot : connexion Microsoft (MSAL) + fichier JSON sur SharePoint
+   SharePoint est la source de vérité. Le stockage du navigateur ne sert
+   que de cache (lecture hors ligne) et de brouillon (modifications non
+   enregistrées). Les scripts de l'application ne démarrent qu'une fois
+   les données SharePoint chargées.
+   ===================================================================== */
+(function () {
+  'use strict';
+  var C = window.RDP_CONFIG || (typeof RDP_CONFIG !== 'undefined' ? RDP_CONFIG : {});
+  var S = window.__rdpSync || { listeners: [], applying: false };
+  var GRAPH = 'https://graph.microsoft.com/v1.0';
+  var KEYS = ['rdpilot.tasks', 'rdpilot.team', 'rdpilot.config', 'rdpilot.skillCatalog', 'rdpilot.specStatuses'];
+  var META_KEY = 'rdpilot.sp.meta';
+  var LOC_KEY = 'rdpilot.sp.location';
+  var APP_SCRIPT = 'script[type="text/x-rdpilot-app"]';
+
+  var st = {
+    msal: null, account: null, driveId: null, itemId: null, parentId: null, fileName: null,
+    eTag: null, base: null, lastMod: null, canWrite: false, readOnlyReason: '',
+    dirty: false, forceDirty: false, savedCanon: null, saving: false, saveSeq: 0,
+    booted: false, offline: false, remotePending: false
+  };
+  var origExportPayload = null;
+
+  /* ---------- petits utilitaires ---------- */
+  function q(s) { return document.querySelector(s); }
+  function esc(v) {
+    return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function filled(v) { return !!v && !/^A_REMPLIR/i.test(String(v).trim()); }
+  function sortKeys(v) {
+    if (Array.isArray(v)) return v.map(sortKeys);
+    if (v && typeof v === 'object') return Object.keys(v).sort().reduce(function (o, k) { o[k] = sortKeys(v[k]); return o; }, {});
+    return v;
+  }
+  function canon(v) { return JSON.stringify(sortKeys(v === undefined ? null : v)); }
+  function readJSON(key, fallback) { try { var v = JSON.parse(localStorage.getItem(key) || 'null'); return v == null ? fallback : v; } catch (e) { return fallback; } }
+  function writeKey(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {} }
+  function dateLabel(iso) {
+    if (!iso) return '';
+    var d = new Date(iso), now = new Date();
+    var time = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    if (d.toDateString() === now.toDateString()) return 'aujourd’hui à ' + time;
+    return 'le ' + d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) + ' à ' + time;
+  }
+  function stamp() {
+    var d = new Date(), p = function (n) { return String(n).padStart(2, '0'); };
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + '_' + p(d.getHours()) + 'h' + p(d.getMinutes());
+  }
+  function download(filename, obj) {
+    try {
+      var blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
+      return true;
+    } catch (e) { return false; }
+  }
+  function notify(msg) { if (typeof toast === 'function') toast(msg); }
+  function userName() { return (st.account && (st.account.name || st.account.username)) || ''; }
+  function modByName(item) {
+    var u = item && item.lastModifiedBy && (item.lastModifiedBy.user || item.lastModifiedBy.application);
+    return (u && u.displayName) || 'un membre de l’équipe';
+  }
+
+  /* ---------- écran de chargement / connexion ---------- */
+  function overlay(title, text, buttons, detail, spinner) {
+    var o = q('#rdpOverlay');
+    o.hidden = false;
+    var html = '<span class="rdp-mark">R</span><h1>' + esc(title) + '</h1>' + (text ? '<p>' + text + '</p>' : '');
+    if (spinner) html += '<div class="rdp-spin"></div>';
+    (buttons || []).forEach(function (b, i) {
+      html += '<button type="button" class="btn ' + (b.kind || 'primary') + '" data-rdp-btn="' + i + '">' + esc(b.label) + '</button>';
+    });
+    if (detail) html += '<small>' + esc(detail) + '</small>';
+    o.querySelector('.rdp-card').innerHTML = html;
+    (buttons || []).forEach(function (b, i) { o.querySelector('[data-rdp-btn="' + i + '"]').onclick = b.action; });
+  }
+  function hideOverlay() { q('#rdpOverlay').hidden = true; }
+
+  /* ---------- fenêtre de dialogue ---------- */
+  function modal(opts) {
+    return new Promise(function (resolve) {
+      var dlg = q('#rdpModal');
+      q('#rdpModalEyebrow').textContent = opts.eyebrow || '';
+      q('#rdpModalTitle').textContent = opts.title || '';
+      q('#rdpModalText').innerHTML = opts.html || '';
+      var box = q('#rdpModalActions');
+      box.innerHTML = '';
+      var buttons = opts.buttons || [{ label: 'OK', value: 'ok', kind: 'primary' }];
+      buttons.forEach(function (b) {
+        var el = document.createElement('button');
+        el.type = 'button';
+        el.className = 'btn ' + (b.kind || 'ghost');
+        el.textContent = b.label;
+        el.onclick = function () { dlg.close(b.value); };
+        box.appendChild(el);
+      });
+      dlg.onclose = function () { resolve(dlg.returnValue || opts.cancelValue || buttons[buttons.length - 1].value); };
+      dlg.returnValue = '';
+      if (dlg.open) dlg.close();
+      dlg.showModal();
+    });
+  }
+
+  /* ---------- pastille d'état et bandeau ---------- */
+  function pill(state, text, title) {
+    var p = q('#syncStatus');
+    if (!p) return;
+    p.dataset.state = state;
+    p.textContent = text;
+    p.title = title || '';
+  }
+  function banner(text, buttons, isError) {
+    var b = q('#rdpBanner');
+    if (!b) return;
+    if (!text) { b.hidden = true; b.innerHTML = ''; return; }
+    b.className = 'rdp-banner' + (isError ? ' error' : '');
+    b.innerHTML = '<span>' + text + '</span><span></span>';
+    var zone = b.lastElementChild;
+    (buttons || []).forEach(function (btn) {
+      var el = document.createElement('button');
+      el.type = 'button';
+      el.className = 'btn ' + (btn.kind || 'ghost');
+      el.textContent = btn.label;
+      el.onclick = btn.action;
+      zone.appendChild(el);
+    });
+    b.hidden = false;
+  }
+  function refreshUI() {
+    var save = q('#rdpSaveBtn');
+    if (st.offline) { pill('local', 'Hors ligne · lecture seule'); if (save) save.hidden = true; return; }
+    if (!st.canWrite) { pill('local', 'Lecture seule', st.readOnlyReason); if (save) save.hidden = true; return; }
+    if (save) { save.hidden = false; save.disabled = st.saving || !st.dirty; }
+    if (st.saving) return pill('saving', 'Enregistrement…');
+    if (st.dirty) return pill('pending', 'Modifications non enregistrées', 'Cliquez sur « Enregistrer » pour les partager');
+    var by = st.lastMod && st.lastMod.by ? ' par ' + st.lastMod.by : '';
+    pill('ok', 'À jour', st.lastMod ? 'Dernier enregistrement ' + dateLabel(st.lastMod.at) + by : '');
+  }
+
+  /* ---------- connexion Microsoft ---------- */
+  function redirectUri() {
+    if (filled(C.REDIRECT_URI)) return C.REDIRECT_URI;
+    return window.location.origin + window.location.pathname.replace(/index\.html?$/i, '');
+  }
+  function isInteraction(e) {
+    var code = (e && (e.errorCode || e.name)) || '';
+    return (window.msal && e instanceof msal.InteractionRequiredAuthError) ||
+      /interaction_required|consent_required|login_required|no_tokens_found|no_account|InteractionRequired/i.test(code);
+  }
+  async function token(mode, forceRefresh) {
+    var req = { scopes: C.SCOPES, account: st.account, forceRefresh: !!forceRefresh };
+    try {
+      return (await st.msal.acquireTokenSilent(req)).accessToken;
+    } catch (e) {
+      if (!isInteraction(e)) throw e;
+      if (mode === 'popup') {
+        try { return (await st.msal.acquireTokenPopup({ scopes: C.SCOPES, account: st.account })).accessToken; }
+        catch (p) { if (!/popup|block|user_cancelled/i.test((p && p.errorCode) || '')) throw p; }
+      }
+      // Avant une redirection, le brouillon est déjà dans le navigateur : rien n'est perdu.
+      window.removeEventListener('beforeunload', beforeUnload);
+      await st.msal.acquireTokenRedirect({ scopes: C.SCOPES, account: st.account });
+      return new Promise(function () {});
+    }
+  }
+  async function graph(path, opts, mode) {
+    opts = opts || {};
+    var url = /^https:/.test(path) ? path : GRAPH + path;
+    for (var attempt = 0; attempt < 2; attempt++) {
+      var headers = Object.assign({}, opts.headers || {}, { Authorization: 'Bearer ' + await token(mode, attempt > 0) });
+      var res = await fetch(url, Object.assign({}, opts, { headers: headers, cache: 'no-store' }));
+      if (res.status !== 401) return res;
+    }
+    return res;
+  }
+  async function graphJSON(path, opts, mode) {
+    var res = await graph(path, opts, mode);
+    if (!res.ok) { var err = new Error('HTTP ' + res.status); err.status = res.status; try { err.body = await res.text(); } catch (e) {} throw err; }
+    return res.json();
+  }
+
+  /* ---------- fichier SharePoint ---------- */
+  function shareId(url) {
+    var b64 = btoa(unescape(encodeURIComponent(url.trim())));
+    return 'u!' + b64.replace(/=+$/, '').replace(/\//g, '_').replace(/\+/g, '-');
+  }
+  async function resolveFile() {
+    if (filled(C.DRIVE_ID) && filled(C.ITEM_ID)) { st.driveId = C.DRIVE_ID.trim(); st.itemId = C.ITEM_ID.trim(); return; }
+    var cached = readJSON(LOC_KEY, null);
+    if (cached && cached.url === C.FILE_URL && cached.driveId && cached.itemId) { st.driveId = cached.driveId; st.itemId = cached.itemId; return; }
+    var item = await graphJSON('/shares/' + shareId(C.FILE_URL) + '/driveItem?$select=id,name,parentReference');
+    st.driveId = item.parentReference.driveId;
+    st.itemId = item.id;
+    writeKey(LOC_KEY, { url: C.FILE_URL, driveId: st.driveId, itemId: st.itemId });
+  }
+  function itemPath() { return '/drives/' + encodeURIComponent(st.driveId) + '/items/' + encodeURIComponent(st.itemId); }
+  function fileKey() { return st.driveId + '/' + st.itemId; }
+  async function fetchMeta(select) {
+    return graphJSON(itemPath() + (select ? '?$select=id,eTag,lastModifiedDateTime,lastModifiedBy' : ''));
+  }
+  async function fetchContent(meta) {
+    var dl = meta['@microsoft.graph.downloadUrl'];
+    var res = dl ? await fetch(dl, { cache: 'no-store' }) : await graph(itemPath() + '/content');
+    if (!res.ok) { var e = new Error('HTTP ' + res.status); e.status = res.status; throw e; }
+    var data = JSON.parse(await res.text());
+    if (!data || data.format !== 'rdpilot-data' || !Array.isArray(data.team) || !Array.isArray(data.tasks)) {
+      var bad = new Error('format'); bad.code = 'format'; throw bad;
+    }
+    return data;
+  }
+  // Lit l'eTag AVANT le contenu, puis vérifie qu'il n'a pas bougé :
+  // on ne peut donc jamais enregistrer par-dessus une version qu'on n'a pas vue.
+  async function loadServer() {
+    var last = null;
+    for (var i = 0; i < 3; i++) {
+      var meta = await fetchMeta(false);
+      var data = await fetchContent(meta);
+      var check = await fetchMeta(true);
+      last = { meta: meta, data: data };
+      if (check.eTag === meta.eTag) break;
+    }
+    st.parentId = last.meta.parentReference && last.meta.parentReference.id;
+    st.fileName = last.meta.name;
+    return last;
+  }
+  // Test de droit d'écriture sans rien modifier : ouverture puis annulation
+  // d'une session d'envoi. SharePoint refuse (403) si l'utilisateur n'a que la lecture.
+  async function probeWrite() {
+    try {
+      var path = '/drives/' + encodeURIComponent(st.driveId) + '/items/' + encodeURIComponent(st.parentId) +
+        ':/' + encodeURIComponent(st.fileName) + ':/createUploadSession';
+      var res = await graph(path, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ item: { '@microsoft.graph.conflictBehavior': 'replace' } })
+      });
+      if (res.ok) {
+        var s = await res.json();
+        if (s.uploadUrl) fetch(s.uploadUrl, { method: 'DELETE' }).catch(function () {});
+        return { ok: true };
+      }
+      if (res.status === 403 || res.status === 401) return { ok: false, reason: 'Droits SharePoint : lecture seule.' };
+      if (res.status === 423) return { ok: false, reason: 'Le fichier est verrouillé dans SharePoint (extrait ou ouvert). Rechargez la page dans un instant.' };
+      return { ok: false, reason: 'Vérification des droits impossible (code ' + res.status + ').' };
+    } catch (e) {
+      return { ok: false, reason: 'Vérification des droits impossible (' + (e.message || e) + ').' };
+    }
+  }
+
+  /* ---------- données locales (cache et brouillon) ---------- */
+  function writeLocal(data) {
+    S.applying = true;
+    try {
+      writeKey('rdpilot.tasks', data.tasks || []);
+      writeKey('rdpilot.team', data.team || []);
+      writeKey('rdpilot.config', data.config || { sprintStart: '2026-09-14', sprintDays: 7 });
+      writeKey('rdpilot.skillCatalog', Array.isArray(data.skillCatalog) ? data.skillCatalog : []);
+      writeKey('rdpilot.specStatuses', data.specStatuses && typeof data.specStatuses === 'object' ? data.specStatuses : {});
+    } finally { S.applying = false; }
+  }
+  function localCore() {
+    return {
+      team: readJSON('rdpilot.team', []), tasks: readJSON('rdpilot.tasks', []), config: readJSON('rdpilot.config', {}),
+      skillCatalog: readJSON('rdpilot.skillCatalog', []), specStatuses: readJSON('rdpilot.specStatuses', {})
+    };
+  }
+  function hasLocalData() { return localStorage.getItem('rdpilot.tasks') !== null && localStorage.getItem('rdpilot.team') !== null; }
+  function readMeta() { return readJSON(META_KEY, {}); }
+  function saveMeta(extra) {
+    if (st.offline) return;
+    var m = Object.assign(readMeta(), { fileKey: st.driveId ? fileKey() : readMeta().fileKey, eTag: st.eTag, dirty: !!(st.canWrite && st.dirty) }, extra || {});
+    writeKey(META_KEY, m);
+  }
+  function clearLocal() {
+    KEYS.concat([META_KEY, LOC_KEY, 'rdpilot.sp.base']).forEach(function (k) { try { localStorage.removeItem(k); } catch (e) {} });
+  }
+
+  /* ---------- démarrage de l'application ---------- */
+  function runApp() {
+    S.applying = true;
+    try {
+      document.querySelectorAll(APP_SCRIPT).forEach(function (old) {
+        var s = document.createElement('script');
+        s.text = old.text;
+        old.replaceWith(s);
+      });
+    } finally { S.applying = false; }
+    var reset = q('#resetBtn');
+    if (reset) { reset.hidden = true; reset.onclick = null; }
+    origExportPayload = window.planningExportPayload;
+    window.planningExportPayload = exportPayload;
+    try { planningExportPayload = exportPayload; } catch (e) {}
+    S.listeners.push(function () { scheduleDirtyCheck(); });
+    st.booted = true;
+  }
+  function corePayload() {
+    var p = origExportPayload ? origExportPayload() : Object.assign({ format: 'rdpilot-data', version: 1 }, localCore());
+    return { team: p.team, tasks: p.tasks, config: p.config, skillCatalog: p.skillCatalog, specStatuses: p.specStatuses };
+  }
+  function exportPayload() {
+    var now = new Date().toISOString();
+    var out = Object.assign({}, st.base || {}, { format: 'rdpilot-data', version: 1, exportedAt: now }, corePayload());
+    return out;
+  }
+
+  /* ---------- suivi des modifications ---------- */
+  var dirtyTimer = null;
+  function scheduleDirtyCheck() { clearTimeout(dirtyTimer); dirtyTimer = setTimeout(checkDirty, 150); }
+  function checkDirty() {
+    if (!st.booted || !st.canWrite) return false;
+    st.dirty = st.forceDirty || canon(corePayload()) !== st.savedCanon;
+    saveMeta();
+    refreshUI();
+    return st.dirty;
+  }
+
+  /* ---------- enregistrement ---------- */
+  async function save() {
+    if (!st.canWrite || st.saving) return;
+    if (!checkDirty()) { notify('Aucune modification à enregistrer'); return; }
+    if (st.remotePending) { return conflict(); }
+    st.saving = true; st.saveSeq++; refreshUI();
+    var now = new Date().toISOString();
+    var payload = Object.assign({}, st.base || {}, { format: 'rdpilot-data', version: 1, exportedAt: now }, corePayload(),
+      { savedAt: now, savedBy: userName(), savedByEmail: (st.account && st.account.username) || '' });
+    try {
+      var res = await graph(itemPath() + '/content', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'If-Match': st.eTag },
+        body: JSON.stringify(payload, null, 2)
+      }, 'popup');
+      if (res.status === 412 || res.status === 409) { st.saving = false; refreshUI(); return conflict(payload); }
+      if (res.status === 403) {
+        st.saving = false;
+        setReadOnly('Vos droits SharePoint ne permettent pas de modifier ce fichier.');
+        download(C.FILE_PREFIX + '_mes_modifications_' + stamp() + '.json', payload);
+        await modal({ eyebrow: 'ENREGISTREMENT REFUSÉ', title: 'Vous n’avez pas le droit de modifier', html: 'SharePoint a refusé l’enregistrement. Une copie de vos modifications a été téléchargée. Contactez ' + esc(C.SUPPORT_CONTACT) + ' si vous devez pouvoir modifier le planning.' });
+        return;
+      }
+      if (res.status === 423) throw new Error('Le fichier est verrouillé dans SharePoint. Réessayez dans un instant.');
+      if (!res.ok) throw new Error('Erreur SharePoint (code ' + res.status + ').');
+      var item = await res.json();
+      st.eTag = item.eTag;
+      st.base = payload;
+      st.lastMod = { at: item.lastModifiedDateTime || now, by: userName() };
+      st.forceDirty = false;
+      st.savedCanon = canon(corePayload());
+      st.dirty = false;
+      st.saving = false;
+      saveMeta({ cachedAt: now });
+      banner('');
+      refreshUI();
+      notify('Planning enregistré sur SharePoint');
+    } catch (e) {
+      st.saving = false;
+      refreshUI();
+      pill('error', 'Non enregistré · réessayez', String(e.message || e));
+      notify('Enregistrement impossible : ' + (e.message || e));
+    }
+  }
+
+  async function conflict(myPayload) {
+    var payload = myPayload || Object.assign({}, st.base || {}, { format: 'rdpilot-data', version: 1, exportedAt: new Date().toISOString() }, corePayload());
+    var name = C.FILE_PREFIX + '_mes_modifications_' + stamp() + '.json';
+    var saved = download(name, payload);
+    var who = 'Un membre de l’équipe', when = '';
+    try { var m = await fetchMeta(true); who = modByName(m); when = dateLabel(m.lastModifiedDateTime); } catch (e) {}
+    pill('error', 'Conflit · rechargez');
+    var v = await modal({
+      eyebrow: 'CONFLIT D’ENREGISTREMENT', title: 'Une version plus récente existe',
+      html: '<strong>' + esc(who) + '</strong> a enregistré le planning ' + esc(when) + ' pendant que vous travailliez.<br><br>' +
+        'Pour ne pas écraser son travail, <strong>vos modifications n’ont pas été enregistrées</strong>. ' +
+        (saved ? 'Une copie de votre version vient d’être téléchargée (<em>' + esc(name) + '</em>).' : 'Utilisez l’export de secours dans Paramètres pour garder une copie.') +
+        '<br><br>Rechargez la version à jour, puis refaites vos modifications.',
+      buttons: [{ label: 'Plus tard', value: 'later', kind: 'ghost' }, { label: 'Recharger la version à jour', value: 'reload', kind: 'primary' }],
+      cancelValue: 'later'
+    });
+    if (v === 'reload') reloadFresh();
+  }
+  function reloadFresh() {
+    st.forceDirty = false; st.dirty = false;
+    saveMeta({ dirty: false });
+    window.removeEventListener('beforeunload', beforeUnload);
+    window.location.reload();
+  }
+
+  /* ---------- modifications des collègues ---------- */
+  function editing() {
+    if (document.querySelector('dialog[open]')) return true;
+    var a = document.activeElement;
+    return !!(a && a.closest && a.closest('#settingsView') && /INPUT|SELECT|TEXTAREA/.test(a.tagName));
+  }
+  function applyRemote(data, meta) {
+    S.applying = true;
+    try {
+      writeLocal(data);
+      S.applying = true;
+      tasks = Array.isArray(data.tasks) ? data.tasks : [];
+      team = Array.isArray(data.team) ? data.team : [];
+      config = data.config || config;
+      try { skillCatalog = Array.isArray(data.skillCatalog) ? data.skillCatalog : []; } catch (e) {}
+      try { specStatuses = data.specStatuses && typeof data.specStatuses === 'object' ? data.specStatuses : {}; } catch (e) {}
+      render();
+      if (typeof renderSpecs === 'function') renderSpecs();
+    } finally { S.applying = false; }
+    st.base = data;
+    st.eTag = meta.eTag;
+    st.lastMod = { at: meta.lastModifiedDateTime, by: modByName(meta) };
+    st.savedCanon = canon(corePayload());
+    st.dirty = false; st.forceDirty = false; st.remotePending = false;
+    saveMeta({ cachedAt: new Date().toISOString() });
+    banner('');
+    refreshUI();
+  }
+  var polling = false;
+  async function poll() {
+    if (!st.booted || st.offline || st.saving || polling || document.hidden) return;
+    polling = true;
+    var seq = st.saveSeq;
+    try {
+      var m = await fetchMeta(true);
+      if (st.saving || seq !== st.saveSeq || m.eTag === st.eTag) return;
+      checkDirty();
+      if (st.dirty) {
+        st.remotePending = true;
+        banner('<strong>' + esc(modByName(m)) + '</strong> a enregistré une nouvelle version ' + esc(dateLabel(m.lastModifiedDateTime)) +
+          '. Vos modifications en cours ne pourront pas être enregistrées par-dessus.',
+          [{ label: 'Garder une copie et recharger', kind: 'primary', action: function () { conflict(); } }]);
+        return;
+      }
+      if (editing()) return; // on réessaiera au prochain passage
+      var fresh = await loadServer();
+      if (st.saving || seq !== st.saveSeq) return;
+      applyRemote(fresh.data, fresh.meta);
+      notify('Planning mis à jour par ' + modByName(fresh.meta));
+    } catch (e) {
+      /* réseau momentané : on réessaiera */
+    } finally { polling = false; }
+  }
+
+  /* ---------- lecture seule ---------- */
+  var LOCK_SEL = '#settingsView input, #settingsView select, #settingsView textarea, #specTables select, #testBoard select, #taskForm input, #taskForm select, #taskForm textarea';
+  function lockInputs() {
+    if (!document.body.classList.contains('rdp-readonly')) return;
+    document.querySelectorAll(LOCK_SEL).forEach(function (el) { if (!el.disabled) el.disabled = true; });
+    document.querySelectorAll('[draggable="true"]').forEach(function (el) { el.setAttribute('draggable', 'false'); });
+  }
+  var lockObserver = null;
+  function setReadOnly(reason) {
+    st.canWrite = false;
+    st.readOnlyReason = reason || '';
+    st.dirty = false; st.forceDirty = false;
+    document.body.classList.add('rdp-readonly');
+    lockInputs();
+    if (!lockObserver) {
+      var pending = false;
+      lockObserver = new MutationObserver(function () {
+        if (pending) return;
+        pending = true;
+        requestAnimationFrame(function () { pending = false; lockInputs(); });
+      });
+      lockObserver.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['disabled', 'draggable', 'open'] });
+    }
+    saveMeta({ dirty: false });
+    refreshUI();
+    renderUserBox();
+  }
+  ['pointerdown', 'mousedown', 'touchstart', 'dragstart', 'drop', 'submit'].forEach(function (type) {
+    window.addEventListener(type, function (e) {
+      if (!document.body.classList.contains('rdp-readonly')) return;
+      var t = e.target;
+      if (type === 'submit') {
+        if (t && t.id === 'taskForm') { e.preventDefault(); e.stopImmediatePropagation(); }
+        return;
+      }
+      if (t && t.closest && t.closest('.bar, .milestone, .drag-handle, .gantt-row')) {
+        if (type === 'dragstart' || type === 'drop') e.preventDefault();
+        e.stopPropagation();
+      }
+    }, true);
+  });
+
+  /* ---------- encart utilisateur, bouton Enregistrer ---------- */
+  function renderUserBox() {
+    var box = q('#rdpUser');
+    if (!box || !st.account) return;
+    var role = st.offline ? 'Hors ligne' : st.canWrite ? 'Éditeur' : 'Lecture seule';
+    box.innerHTML = '<strong title="' + esc(st.account.username) + '">' + esc(userName()) + '</strong><span>' + esc(role) + '</span>' +
+      '<button type="button" id="rdpLogout">Se déconnecter</button>';
+    q('#rdpLogout').onclick = logout;
+    box.hidden = false;
+    var mob = q('#rdpUserMobile');
+    if (mob) {
+      mob.innerHTML = '<button type="button">Se déconnecter</button>';
+      mob.firstChild.onclick = logout;
+      mob.hidden = false;
+    }
+  }
+  async function logout() {
+    if (st.canWrite && checkDirty()) {
+      var v = await modal({
+        eyebrow: 'DÉCONNEXION', title: 'Modifications non enregistrées',
+        html: 'Vos modifications ne sont pas enregistrées sur SharePoint. Elles seront perdues si vous vous déconnectez.',
+        buttons: [{ label: 'Annuler', value: 'cancel', kind: 'ghost' }, { label: 'Télécharger une copie et se déconnecter', value: 'dl', kind: 'ghost' }, { label: 'Enregistrer d’abord', value: 'save', kind: 'primary' }],
+        cancelValue: 'cancel'
+      });
+      if (v === 'cancel') return;
+      if (v === 'save') { await save(); if (st.dirty) return; }
+      if (v === 'dl') download(C.FILE_PREFIX + '_mes_modifications_' + stamp() + '.json', exportPayload());
+    }
+    window.removeEventListener('beforeunload', beforeUnload);
+    clearLocal();
+    st.msal.logoutRedirect({ account: st.account, postLogoutRedirectUri: redirectUri() });
+  }
+  function beforeUnload(e) {
+    if (st.canWrite && checkDirty()) { e.preventDefault(); e.returnValue = ''; return ''; }
+  }
+
+  /* ---------- erreurs lisibles ---------- */
+  function explain(e) {
+    var code = (e && (e.errorCode || e.code)) || '', msg = (e && (e.errorMessage || e.message)) || String(e);
+    if (/AADSTS65001|consent/i.test(code + msg)) return 'L’application n’a pas encore reçu le consentement de l’administrateur Microsoft de K-Motors. Contactez ' + esc(C.SUPPORT_CONTACT) + '.';
+    if (/AADSTS50011|redirect/i.test(code + msg)) return 'L’adresse de cette page n’est pas déclarée dans l’inscription d’application (URI de redirection). Contactez ' + esc(C.SUPPORT_CONTACT) + '.';
+    if (/AADSTS700016|AADSTS90002|unauthorized_client/i.test(code + msg)) return 'Identifiants d’application ou de locataire incorrects dans la configuration de la page.';
+    if (e && e.code === 'format') return 'Le fichier trouvé sur SharePoint n’est pas un fichier de données R&D Pilot valide.';
+    if (e && e.status === 404) return 'Le fichier du planning est introuvable sur SharePoint, ou vous n’y avez pas accès. Contactez ' + esc(C.SUPPORT_CONTACT) + '.';
+    if (e && e.status === 403) return 'Vous n’avez pas accès au fichier du planning. Demandez l’accès à ' + esc(C.SUPPORT_CONTACT) + '.';
+    if (e instanceof TypeError || /Failed to fetch|NetworkError|network/i.test(msg)) return 'Connexion à Microsoft 365 impossible (réseau).';
+    return 'Erreur inattendue. Contactez ' + esc(C.SUPPORT_CONTACT) + '.';
+  }
+
+  /* ---------- séquence de démarrage ---------- */
+  function mobileReadOnly() {
+    return !!C.MOBILE_READ_ONLY && window.matchMedia && window.matchMedia('(max-width: ' + (C.MOBILE_MAX_WIDTH || 820) + 'px)').matches;
+  }
+  function startOffline(err) {
+    st.offline = true;
+    st.canWrite = false;
+    st.base = Object.assign({ format: 'rdpilot-data', version: 1 }, localCore());
+    var cachedSpecs = readJSON('rdpilot.sp.specCatalog', null);
+    if (cachedSpecs) window.RDP_SPEC_CATALOG = cachedSpecs;
+    document.body.classList.add('rdp-readonly');
+    runApp();
+    setReadOnly('Hors ligne');
+    st.offline = true;
+    hideOverlay();
+    var m = readMeta();
+    banner('Hors ligne : vous consultez la dernière version chargée sur cet appareil' + (m.cachedAt ? ' (' + esc(dateLabel(m.cachedAt)) + ')' : '') + '. Rien ne peut être modifié.',
+      [{ label: 'Réessayer', kind: 'primary', action: function () { window.location.reload(); } }], true);
+    refreshUI();
+    renderUserBox();
+  }
+
+  async function boot() {
+    if (!window.msal || !window.msal.PublicClientApplication) {
+      return overlay('Connexion impossible', 'Le module de connexion Microsoft n’a pas pu être chargé (réseau, pare-feu ou bloqueur de contenu).', [{ label: 'Réessayer', action: function () { location.reload(); } }]);
+    }
+    if (!filled(C.TENANT_ID) || !filled(C.CLIENT_ID) || !(filled(C.FILE_URL) || (filled(C.DRIVE_ID) && filled(C.ITEM_ID)))) {
+      return overlay('Configuration incomplète', 'Renseignez TENANT_ID, CLIENT_ID et l’emplacement du fichier (FILE_URL, ou DRIVE_ID + ITEM_ID) dans le bloc de configuration en haut de index.html.');
+    }
+    overlay('R&D Pilot', 'Connexion à Microsoft 365…', null, null, true);
+    st.msal = new msal.PublicClientApplication({
+      auth: {
+        clientId: C.CLIENT_ID.trim(),
+        authority: 'https://login.microsoftonline.com/' + C.TENANT_ID.trim(),
+        redirectUri: redirectUri(),
+        postLogoutRedirectUri: redirectUri(),
+        navigateToLoginRequestUrl: false
+      },
+      cache: { cacheLocation: 'localStorage' }
+    });
+    try {
+      await st.msal.initialize();
+      var r = await st.msal.handleRedirectPromise();
+      st.account = (r && r.account) || st.msal.getActiveAccount() || st.msal.getAllAccounts()[0] || null;
+    } catch (e) {
+      return overlay('Connexion refusée', explain(e), [{ label: 'Réessayer', action: function () { st.msal.loginRedirect({ scopes: C.SCOPES, prompt: 'select_account' }); } }], (e && (e.errorCode || e.message)) || '');
+    }
+    if (!st.account) {
+      return overlay('R&D Pilot', 'Connectez-vous avec votre compte Microsoft K-Motors pour consulter le planning R&amp;D.',
+        [{ label: 'Se connecter', action: function () { st.msal.loginRedirect({ scopes: C.SCOPES, prompt: 'select_account' }); } }]);
+    }
+    st.msal.setActiveAccount(st.account);
+
+    var server;
+    try {
+      overlay('R&D Pilot', 'Chargement du planning depuis SharePoint…', null, null, true);
+      await resolveFile();
+      server = await loadServer();
+    } catch (e) {
+      if (C.KEEP_OFFLINE_CACHE && hasLocalData() && (e instanceof TypeError || /fetch|network/i.test(String(e && e.message)))) {
+        return overlay('Hors ligne', explain(e), [
+          { label: 'Réessayer', action: function () { location.reload(); } },
+          { label: 'Voir la dernière version (lecture seule)', kind: 'ghost', action: function () { startOffline(e); } }
+        ]);
+      }
+      if (e && e.status === 404) { try { localStorage.removeItem(LOC_KEY); } catch (x) {} }
+      return overlay('Planning indisponible', explain(e), [
+        { label: 'Réessayer', action: function () { location.reload(); } },
+        { label: 'Changer de compte', kind: 'ghost', action: function () { clearLocal(); st.msal.logoutRedirect({ account: st.account, postLogoutRedirectUri: redirectUri() }); } }
+      ], (e && (e.status ? 'HTTP ' + e.status : (e.errorCode || e.message))) || '');
+    }
+
+    // Droits d'écriture : vérifiés par SharePoint, pas par la page.
+    var probe = mobileReadOnly() ? { ok: false, reason: 'Sur téléphone, le planning est en consultation seule. Modifiez-le depuis un ordinateur.' } : await probeWrite();
+    st.canWrite = probe.ok;
+    st.readOnlyReason = probe.reason || '';
+
+    // Brouillon laissé par une session précédente ?
+    var meta = readMeta(), useDraft = false;
+    if (meta.dirty && meta.fileKey === fileKey() && hasLocalData()) {
+      var draft = Object.assign({}, server.data, localCore(), { exportedAt: new Date().toISOString() });
+      hideOverlay();
+      if (st.canWrite && meta.eTag === server.meta.eTag) {
+        var v = await modal({
+          eyebrow: 'BROUILLON', title: 'Modifications non enregistrées',
+          html: 'Lors de votre dernière visite, vous avez laissé des modifications sans les enregistrer. Le planning n’a pas changé depuis sur SharePoint.<br><br>Voulez-vous les reprendre ?',
+          buttons: [{ label: 'Ignorer (version SharePoint)', value: 'drop', kind: 'ghost' }, { label: 'Reprendre mes modifications', value: 'resume', kind: 'primary' }],
+          cancelValue: 'drop'
+        });
+        useDraft = v === 'resume';
+      } else {
+        var name = C.FILE_PREFIX + '_mes_modifications_' + stamp() + '.json';
+        var ok = download(name, draft);
+        await modal({
+          eyebrow: 'BROUILLON', title: 'Modifications non enregistrées',
+          html: 'Lors de votre dernière visite, vous avez laissé des modifications sans les enregistrer, mais ' +
+            (st.canWrite ? 'une autre personne a enregistré une nouvelle version entre-temps.' : 'vous n’avez pas (ou plus) le droit de modifier le planning.') +
+            '<br><br>' + (ok ? 'Une copie de vos modifications a été téléchargée (<em>' + esc(name) + '</em>). ' : '') +
+            'La version à jour de SharePoint va s’afficher.'
+        });
+      }
+    }
+
+    if (!useDraft) writeLocal(server.data);
+    window.RDP_SPEC_CATALOG = Array.isArray(server.data.specCatalog) ? server.data.specCatalog : [];
+    if (C.KEEP_OFFLINE_CACHE) writeKey('rdpilot.sp.specCatalog', window.RDP_SPEC_CATALOG);
+    st.base = server.data;
+    st.eTag = server.meta.eTag;
+    st.lastMod = { at: server.meta.lastModifiedDateTime, by: modByName(server.meta) };
+    if (!st.canWrite) document.body.classList.add('rdp-readonly');
+
+    runApp();
+
+    st.savedCanon = useDraft ? null : canon(corePayload());
+    st.forceDirty = useDraft;
+    st.dirty = useDraft;
+    if (st.canWrite) {
+      saveMeta({ cachedAt: new Date().toISOString() });
+      var sb = q('#rdpSaveBtn');
+      if (sb) sb.onclick = save;
+      window.addEventListener('beforeunload', beforeUnload);
+      document.addEventListener('keydown', function (e) {
+        if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) { e.preventDefault(); save(); }
+      });
+    } else {
+      setReadOnly(st.readOnlyReason);
+    }
+    if (!C.KEEP_OFFLINE_CACHE) window.addEventListener('pagehide', function () { if (!st.dirty) KEYS.forEach(function (k) { try { localStorage.removeItem(k); } catch (e) {} }); });
+    if (!window.RDP_SPEC_CATALOG.length) {
+      var rs = window.renderSpecs;
+      if (typeof rs === 'function') {
+        var wrapped = function () {
+          rs();
+          var box = q('#specTables');
+          if (box) box.innerHTML = '<p class="settings-note">Le catalogue des spécifications (champ « specCatalog ») est absent du fichier de données SharePoint.</p>';
+        };
+        window.renderSpecs = wrapped;
+        try { renderSpecs = wrapped; } catch (e) {}
+      }
+    }
+    hideOverlay();
+    renderUserBox();
+    refreshUI();
+    setInterval(poll, Math.max(20, Number(C.REFRESH_SECONDS) || 60) * 1000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) poll(); });
+  }
+
+  boot().catch(function (e) {
+    console.error(e);
+    overlay('Erreur', explain(e), [{ label: 'Recharger', action: function () { location.reload(); } }], (e && (e.errorCode || e.message)) || '');
+  });
+})();
+</script>
+</body>
+</html>
