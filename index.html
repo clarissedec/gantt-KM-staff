@@ -2249,6 +2249,65 @@ $('#exportDataBtn').onclick = async () => {
   };
   var origExportPayload = null;
 
+  /* ---------- Microsoft Teams (onglet d'équipe) ---------- */
+  var TEAMS_JS = 'https://cdn.jsdelivr.net/npm/@microsoft/teams-js@2.58.0/dist/umd/MicrosoftTeams.min.js';
+  var TEAMS_SRI = 'sha384-sMo/EOqQPa1OCup2/VBRum7oFeOS22kvs8WGDc45xK53tUVZzFR5WwFYDUYN1LO4';
+  var QS = new URLSearchParams(window.location.search);
+  var IN_FRAME = (function () { try { return window.self !== window.parent; } catch (e) { return true; } })();
+  var TEAMS_HINT = QS.get('host') === 'teams';
+  var TEAMS_CONFIG = QS.get('teamsconfig') === '1';
+  st.teams = false; st.naa = false;
+  function loadScript(src, integrity) {
+    return new Promise(function (resolve, reject) {
+      var sc = document.createElement('script');
+      sc.src = src; sc.crossOrigin = 'anonymous';
+      if (integrity) sc.integrity = integrity;
+      sc.onload = resolve; sc.onerror = function () { reject(new Error('script')); };
+      document.head.appendChild(sc);
+    });
+  }
+  async function initTeams() {
+    if (!(TEAMS_HINT || TEAMS_CONFIG) || !IN_FRAME) return false;
+    try {
+      await loadScript(TEAMS_JS, TEAMS_SRI);
+      await Promise.race([window.microsoftTeams.app.initialize(), new Promise(function (_, rej) { setTimeout(function () { rej(new Error('timeout')); }, 8000); })]);
+      return true;
+    } catch (e) { return false; }
+  }
+  function pageUrl() { return redirectUri(); }
+  function openInBrowser() {
+    try { if (st.teams && window.microsoftTeams && window.microsoftTeams.app.openLink) { window.microsoftTeams.app.openLink(pageUrl()); return; } } catch (e) {}
+    window.open(pageUrl(), '_blank', 'noopener');
+  }
+  function teamsConfigPage() {
+    overlay('Gantt Pilot', 'Cliquez sur « Enregistrer » pour ajouter le Gantt à ce canal. Chacun le verra avec ses propres droits (lecture ou modification).');
+    var T = window.microsoftTeams;
+    T.pages.config.registerOnSaveHandler(function (evt) {
+      T.pages.config.setConfig({
+        entityId: 'gantt-pilot',
+        contentUrl: pageUrl() + '?host=teams',
+        websiteUrl: pageUrl(),
+        suggestedDisplayName: 'Gantt Pilot'
+      }).then(function () { evt.notifySuccess(); }, function (err) { evt.notifyFailure(String(err && err.message || err)); });
+    });
+    T.pages.config.setValidityState(true);
+  }
+  // Dans Teams, le téléchargement direct est souvent bloqué : on propose une copie du texte à la place.
+  function keepCopy(filename, obj) {
+    if (!st.teams || typeof window.rdExportFallback !== 'function') return Promise.resolve(download(filename, obj) ? 'download' : false);
+    return new Promise(function (resolve) {
+      window.rdExportFallback(JSON.stringify(obj, null, 2), 'Dans Teams, le téléchargement direct n’est pas disponible. Gardez une copie de votre version.');
+      var dlg = document.getElementById('exportFallback');
+      if (!dlg) return resolve(false);
+      dlg.addEventListener('close', function once() { dlg.removeEventListener('close', once); resolve('copy'); });
+    });
+  }
+  function copyText(how, name) {
+    if (how === 'download') return 'Une copie de votre version vient d’être téléchargée (<em>' + esc(name) + '</em>).';
+    if (how === 'copy') return 'Une copie de votre version vous a été proposée dans la fenêtre « Export manuel ».';
+    return 'Utilisez l’export de secours dans Paramètres pour garder une copie.';
+  }
+
   /* ---------- petits utilitaires ---------- */
   function q(s) { return document.querySelector(s); }
   function esc(v) {
@@ -2382,6 +2441,10 @@ $('#exportDataBtn').onclick = async () => {
   }
   async function token(mode, forceRefresh) {
     var req = { scopes: C.SCOPES, account: st.account, forceRefresh: !!forceRefresh };
+    if (st.naa) {
+      try { return (await st.msal.acquireTokenSilent(req)).accessToken; }
+      catch (e) { return (await st.msal.acquireTokenPopup({ scopes: C.SCOPES })).accessToken; }
+    }
     try {
       return (await st.msal.acquireTokenSilent(req)).accessToken;
     } catch (e) {
@@ -2565,8 +2628,8 @@ $('#exportDataBtn').onclick = async () => {
       if (res.status === 403) {
         st.saving = false;
         setReadOnly('Vos droits SharePoint ne permettent pas de modifier ce fichier.');
-        download(C.FILE_PREFIX + '_mes_modifications_' + stamp() + '.json', payload);
-        await modal({ eyebrow: 'ENREGISTREMENT REFUSÉ', title: 'Vous n’avez pas le droit de modifier', html: 'SharePoint a refusé l’enregistrement. Une copie de vos modifications a été téléchargée. Contactez ' + esc(C.SUPPORT_CONTACT) + ' si vous devez pouvoir modifier le planning.' });
+        var how403 = await keepCopy(C.FILE_PREFIX + '_mes_modifications_' + stamp() + '.json', payload);
+        await modal({ eyebrow: 'ENREGISTREMENT REFUSÉ', title: 'Vous n’avez pas le droit de modifier', html: 'SharePoint a refusé l’enregistrement. ' + copyText(how403, '') + ' Contactez ' + esc(C.SUPPORT_CONTACT) + ' si vous devez pouvoir modifier le planning.' });
         return;
       }
       if (res.status === 423) throw new Error('Le fichier est verrouillé dans SharePoint. Réessayez dans un instant.');
@@ -2594,7 +2657,7 @@ $('#exportDataBtn').onclick = async () => {
   async function conflict(myPayload) {
     var payload = myPayload || Object.assign({}, st.base || {}, { format: 'rdpilot-data', version: 1, exportedAt: new Date().toISOString() }, corePayload());
     var name = C.FILE_PREFIX + '_mes_modifications_' + stamp() + '.json';
-    var saved = download(name, payload);
+    var saved = await keepCopy(name, payload);
     var who = 'Un membre de l’équipe', when = '';
     try { var m = await fetchMeta(true); who = modByName(m); when = dateLabel(m.lastModifiedDateTime); } catch (e) {}
     pill('error', 'Conflit · rechargez');
@@ -2602,7 +2665,7 @@ $('#exportDataBtn').onclick = async () => {
       eyebrow: 'CONFLIT D’ENREGISTREMENT', title: 'Une version plus récente existe',
       html: '<strong>' + esc(who) + '</strong> a enregistré le planning ' + esc(when) + ' pendant que vous travailliez.<br><br>' +
         'Pour ne pas écraser son travail, <strong>vos modifications n’ont pas été enregistrées</strong>. ' +
-        (saved ? 'Une copie de votre version vient d’être téléchargée (<em>' + esc(name) + '</em>).' : 'Utilisez l’export de secours dans Paramètres pour garder une copie.') +
+        copyText(saved, name) +
         '<br><br>Rechargez la version à jour, puis refaites vos modifications.',
       buttons: [{ label: 'Plus tard', value: 'later', kind: 'ghost' }, { label: 'Recharger la version à jour', value: 'reload', kind: 'primary' }],
       cancelValue: 'later'
@@ -2717,14 +2780,16 @@ $('#exportDataBtn').onclick = async () => {
     var box = q('#rdpUser');
     if (!box || !st.account) return;
     var role = st.offline ? 'Hors ligne' : st.canWrite ? 'Éditeur' : 'Lecture seule';
+    var label = st.teams ? 'Ouvrir dans le navigateur' : 'Se déconnecter';
+    var action = st.teams ? openInBrowser : logout;
     box.innerHTML = '<strong title="' + esc(st.account.username) + '">' + esc(userName()) + '</strong><span>' + esc(role) + '</span>' +
-      '<button type="button" id="rdpLogout">Se déconnecter</button>';
-    q('#rdpLogout').onclick = logout;
+      '<button type="button" id="rdpLogout">' + label + '</button>';
+    q('#rdpLogout').onclick = action;
     box.hidden = false;
     var mob = q('#rdpUserMobile');
     if (mob) {
-      mob.innerHTML = '<button type="button">Se déconnecter</button>';
-      mob.firstChild.onclick = logout;
+      mob.innerHTML = '<button type="button">' + label + '</button>';
+      mob.firstChild.onclick = action;
       mob.hidden = false;
     }
   }
@@ -2738,7 +2803,7 @@ $('#exportDataBtn').onclick = async () => {
       });
       if (v === 'cancel') return;
       if (v === 'save') { await save(); if (st.dirty) return; }
-      if (v === 'dl') download(C.FILE_PREFIX + '_mes_modifications_' + stamp() + '.json', exportPayload());
+      if (v === 'dl') await keepCopy(C.FILE_PREFIX + '_mes_modifications_' + stamp() + '.json', exportPayload());
     }
     window.removeEventListener('beforeunload', beforeUnload);
     clearLocal();
@@ -2791,7 +2856,7 @@ $('#exportDataBtn').onclick = async () => {
       return overlay('Configuration incomplète', 'Renseignez TENANT_ID, CLIENT_ID et l’emplacement du fichier (FILE_URL, ou DRIVE_ID + ITEM_ID) dans le bloc de configuration en haut de index.html.');
     }
     overlay('R&D Pilot', 'Connexion à Microsoft 365…', null, null, true);
-    st.msal = new msal.PublicClientApplication({
+    var msalConfig = {
       auth: {
         clientId: C.CLIENT_ID.trim(),
         authority: 'https://login.microsoftonline.com/' + C.TENANT_ID.trim(),
@@ -2800,7 +2865,37 @@ $('#exportDataBtn').onclick = async () => {
         navigateToLoginRequestUrl: false
       },
       cache: { cacheLocation: 'localStorage' }
-    });
+    };
+
+    // Dans un onglet Teams : connexion transmise par Teams (« nested app authentication »).
+    if ((TEAMS_HINT || TEAMS_CONFIG) && IN_FRAME) {
+      st.teams = await initTeams();
+      if (st.teams && TEAMS_CONFIG) return teamsConfigPage();
+      var naaOk = false;
+      try { naaOk = st.teams && window.microsoftTeams.nestedAppAuth && window.microsoftTeams.nestedAppAuth.isNAAChannelRecommended(); } catch (e) {}
+      if (!naaOk || typeof msal.createNestablePublicClientApplication !== 'function') {
+        return overlay('Gantt Pilot', 'Cette version de Teams ne permet pas de se connecter directement dans l’onglet. Ouvrez le Gantt dans votre navigateur.',
+          [{ label: 'Ouvrir dans le navigateur', action: openInBrowser }]);
+      }
+      try {
+        st.msal = await msal.createNestablePublicClientApplication(msalConfig);
+        st.naa = true;
+        var silent = await st.msal.acquireTokenSilent({ scopes: C.SCOPES });
+        st.account = silent.account;
+      } catch (e) {
+        if (!st.msal) return overlay('Connexion impossible', explain(e), [{ label: 'Ouvrir dans le navigateur', action: openInBrowser }], (e && (e.errorCode || e.message)) || '');
+        return overlay('Gantt Pilot', 'Connectez-vous avec votre compte K-Motors pour afficher le planning.', [
+          { label: 'Se connecter', action: async function () {
+            try { var r2 = await st.msal.acquireTokenPopup({ scopes: C.SCOPES }); st.account = r2.account; afterLogin(); }
+            catch (err) { overlay('Connexion impossible', explain(err), [{ label: 'Ouvrir dans le navigateur', action: openInBrowser }], (err && (err.errorCode || err.message)) || ''); }
+          } },
+          { label: 'Ouvrir dans le navigateur', kind: 'ghost', action: openInBrowser }
+        ]);
+      }
+      return afterLogin();
+    }
+
+    st.msal = new msal.PublicClientApplication(msalConfig);
     try {
       await st.msal.initialize();
       var r = await st.msal.handleRedirectPromise();
@@ -2812,7 +2907,11 @@ $('#exportDataBtn').onclick = async () => {
       return overlay('R&D Pilot', 'Connectez-vous avec votre compte Microsoft K-Motors pour consulter le planning R&amp;D.',
         [{ label: 'Se connecter', action: function () { st.msal.loginRedirect({ scopes: C.SCOPES, prompt: 'select_account' }); } }]);
     }
-    st.msal.setActiveAccount(st.account);
+    return afterLogin();
+  }
+
+  async function afterLogin() {
+    try { st.msal.setActiveAccount(st.account); } catch (e) {}
 
     var server;
     try {
@@ -2829,7 +2928,8 @@ $('#exportDataBtn').onclick = async () => {
       if (e && e.status === 404) { try { localStorage.removeItem(LOC_KEY); } catch (x) {} }
       return overlay('Planning indisponible', explain(e), [
         { label: 'Réessayer', action: function () { location.reload(); } },
-        { label: 'Changer de compte', kind: 'ghost', action: function () { clearLocal(); st.msal.logoutRedirect({ account: st.account, postLogoutRedirectUri: redirectUri() }); } }
+        st.teams ? { label: 'Ouvrir dans le navigateur', kind: 'ghost', action: openInBrowser }
+                 : { label: 'Changer de compte', kind: 'ghost', action: function () { clearLocal(); st.msal.logoutRedirect({ account: st.account, postLogoutRedirectUri: redirectUri() }); } }
       ], (e && (e.status ? 'HTTP ' + e.status : (e.errorCode || e.message))) || '');
     }
 
@@ -2853,12 +2953,12 @@ $('#exportDataBtn').onclick = async () => {
         useDraft = v === 'resume';
       } else {
         var name = C.FILE_PREFIX + '_mes_modifications_' + stamp() + '.json';
-        var ok = download(name, draft);
+        var ok = await keepCopy(name, draft);
         await modal({
           eyebrow: 'BROUILLON', title: 'Modifications non enregistrées',
           html: 'Lors de votre dernière visite, vous avez laissé des modifications sans les enregistrer, mais ' +
             (st.canWrite ? 'une autre personne a enregistré une nouvelle version entre-temps.' : 'vous n’avez pas (ou plus) le droit de modifier le planning.') +
-            '<br><br>' + (ok ? 'Une copie de vos modifications a été téléchargée (<em>' + esc(name) + '</em>). ' : '') +
+            '<br><br>' + (ok ? copyText(ok, name) + ' ' : '') +
             'La version à jour de SharePoint va s’afficher.'
         });
       }
@@ -2900,6 +3000,10 @@ $('#exportDataBtn').onclick = async () => {
         window.renderSpecs = wrapped;
         try { renderSpecs = wrapped; } catch (e) {}
       }
+    }
+    if (st.teams) {
+      var exp = q('#exportDataBtn');
+      if (exp && typeof window.rdExportFallback === 'function') exp.onclick = function () { window.rdExportFallback(JSON.stringify(exportPayload(), null, 2), 'Dans Teams, le téléchargement direct n’est pas disponible.'); };
     }
     hideOverlay();
     renderUserBox();
