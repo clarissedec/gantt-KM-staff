@@ -559,6 +559,7 @@ const RDP_CONFIG = {
 #rdpUserMobile button{border:0;background:transparent;color:#167457;font-size:11px;font-weight:700;cursor:pointer;padding:0 0 0 8px}
 @media (max-width:900px){.rdp-user{display:none!important}#rdpUserMobile:not([hidden]){display:inline-block}}
 .bar.Industrialisation{background:#b45309}.leg.indus{background:#b45309}
+.bar.task-production{background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.28) 0 5px,transparent 5px 10px)!important}.leg.prod{background:repeating-linear-gradient(135deg,#8993a5 0 2px,#d5dae3 2px 4px)}.type-badge.production{background:#fdecdc;color:#9a4508}.production-tag{color:#9a4508;font-weight:700}
 #rdpSaveBtn:disabled{opacity:.45;cursor:default}
 .rdp-banner{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:#fff5dc;color:#7a5608;border:1px solid #f1dca0;border-radius:10px;padding:10px 14px;margin:0 0 14px;font-size:13px}
 .rdp-banner[hidden]{display:none!important}
@@ -655,7 +656,7 @@ body.rdp-readonly .bar,body.rdp-readonly .milestone{cursor:default}
           </div>
           <div id="ganttBody"></div>
         </div>
-        <div class="legend"><span><i class="leg research"></i>Recherche</span><span><i class="leg prototype"></i>Prototype</span><span><i class="leg test"></i>Tests</span><span><i class="leg scale"></i>Échelle</span><span><i class="leg indus"></i>Industrialisation</span><span><i class="diamond"></i>Jalon TRL</span><span><i class="diamond keystep"></i>Étape clé</span></div>
+        <div class="legend"><span><i class="leg research"></i>Recherche</span><span><i class="leg prototype"></i>Prototype</span><span><i class="leg test"></i>Tests</span><span><i class="leg scale"></i>Échelle</span><span><i class="leg indus"></i>Industrialisation</span><span><i class="leg prod"></i>Production</span><span><i class="diamond"></i>Jalon TRL</span><span><i class="diamond keystep"></i>Étape clé</span></div>
       </section>
 
       <section id="capacityView" hidden>
@@ -738,7 +739,7 @@ body.rdp-readonly .bar,body.rdp-readonly .milestone{cursor:default}
       <input type="hidden" id="taskId">
       <label>Nom de la tâche<input id="taskName" required></label>
       <div class="form-grid">
-        <label>Type<select id="taskType"><option value="research">Recherche</option><option value="development">Développement</option><option value="supply">Bloc supply</option><option value="decision">Jalon de décision</option></select></label>
+        <label>Type<select id="taskType"><option value="research">Recherche</option><option value="development">Développement</option><option value="production">Production</option><option value="supply">Bloc supply</option><option value="decision">Jalon de décision</option></select></label>
         <label class="decision-optional">Équipe<select id="taskTeam"><option>R&amp;D</option><option>Test</option><option>Mechanical Design</option><option>Industrialisation</option></select></label>
         <label class="decision-optional">Phase<select id="taskPhase"><option>Recherche</option><option>Prototype</option><option>Tests prototype</option><option>Tests à l'échelle</option><option>Supply</option><option>Industrialisation</option></select></label>
         <label class="decision-optional">Avancement (%)<input id="taskProgress" type="number" min="0" max="100" value="0"></label>
@@ -883,6 +884,7 @@ renderSettings = function () {
     const badge = row.querySelector('.type-badge');
     if (task.type === 'research') badge.textContent = 'RECHERCHE';
     if (task.type === 'development') badge.textContent = 'DÉVELOPPEMENT';
+    if (task.type === 'production') { badge.textContent = 'PRODUCTION'; badge.classList.add('production'); }
     const group = document.createElement('span');
     group.className = 'type-badge';
     group.textContent = task.teamGroup;
@@ -2611,13 +2613,22 @@ $('#exportDataBtn').onclick = async () => {
       el.innerHTML = i % every === 0 ? esc(parts[0]) + '<br><span style="font-weight:400">' + esc(parts[1] || '') + '</span>' : '';
     });
   }
+  function tagProduction() {
+    document.querySelectorAll('.task-cell[data-id]').forEach(function (cell) {
+      var t = tasks.find(function (x) { return x.id == cell.dataset.id; });
+      var meta = cell.querySelector('.task-meta');
+      if (!t || !meta || t.type !== 'production' || meta.querySelector('.production-tag')) return;
+      meta.insertAdjacentHTML('beforeend', '<span class="production-tag">Production</span>');
+    });
+  }
   function compactWeekLabelsSetup() {
     var base = window.renderGantt;
     if (typeof base !== 'function') return;
-    var wrapped = function () { var r = base.apply(this, arguments); try { compactWeekLabels(); } catch (e) {} return r; };
+    var wrapped = function () { var r = base.apply(this, arguments); try { compactWeekLabels(); } catch (e) {} try { tagProduction(); } catch (e) {} return r; };
     window.renderGantt = wrapped;
     try { renderGantt = wrapped; } catch (e) {}
     try { compactWeekLabels(); } catch (e) {}
+    try { tagProduction(); } catch (e) {}
     window.addEventListener('resize', function () { try { renderGantt(); } catch (e) {} });
   }
   function corePayload() {
