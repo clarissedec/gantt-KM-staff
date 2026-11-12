@@ -558,6 +558,29 @@ const RDP_CONFIG = {
 #rdpUserMobile{display:none}
 #rdpUserMobile button{border:0;background:transparent;color:#167457;font-size:11px;font-weight:700;cursor:pointer;padding:0 0 0 8px}
 @media (max-width:900px){.rdp-user{display:none!important}#rdpUserMobile:not([hidden]){display:inline-block}}
+.gantt-head,.gantt-row{grid-template-columns:var(--task-col) minmax(var(--rdp-tl,780px),1fr)!important;min-width:calc(var(--task-col) + var(--rdp-tl,780px))!important}
+#timelineHead.rdp-head{display:block!important;position:relative;height:54px;overflow:hidden}
+.rdp-mon{position:absolute;top:0;height:22px;border-left:1px solid #c9d1dd;border-bottom:1px solid var(--line);background:#f1f4f8;font-size:11px;font-weight:750;color:#2b3446;padding:4px 7px;white-space:nowrap;overflow:hidden;text-transform:capitalize}
+.rdp-mon.rdp-mon-tall{height:54px;padding-top:18px}
+.rdp-wk{position:absolute;top:22px;bottom:0;border-left:1px solid #dfe4eb;padding:3px 0 0 5px;font-size:10px;color:var(--muted);white-space:nowrap;line-height:1.2}
+.rdp-wk b{display:block;color:#3d4658;font-size:10.5px}
+.rdp-wk.rdp-wk-minor{border-left-color:#edf0f4}
+.rdp-sprint{position:absolute;top:4px;margin-left:4px;font-size:9px;font-weight:800;color:#2f7d67;background:#e6f7f0;border-radius:4px;padding:1px 4px;white-space:nowrap;z-index:1}
+.rdp-today{position:absolute;bottom:2px;transform:translateX(-50%);background:#ef5964;color:#fff;font-size:9px;font-weight:800;padding:1px 6px;border-radius:6px;z-index:2;white-space:nowrap}
+.sprint-line:before{display:none!important}
+.sprint-line{opacity:.55}
+#ganttBody .timeline-row{background-size:var(--rdp-wk,calc(100% / 14)) 100%!important;background-position:var(--rdp-wk0,0) 0!important}
+#ganttBody.rdp-nogrid .timeline-row{background-image:none!important}
+.rdp-mline{position:absolute;top:0;bottom:0;border-left:1px solid #cfd6e1;pointer-events:none;z-index:1}
+.task-meta{flex-wrap:wrap;row-gap:3px}
+.rdp-dates{color:#2b3446;font-weight:700}
+.rdp-item{color:var(--c);border:1px solid var(--c);border-radius:6px;padding:0 5px;font-weight:700;font-size:10px;line-height:15px}
+.rdp-block-head{background:#f6f8fb;border-bottom:1px solid var(--line);border-top:2px solid var(--c);min-width:calc(var(--task-col) + var(--rdp-tl,780px))}
+.rdp-block-head span{position:sticky;left:0;display:inline-block;padding:7px 16px;font-size:11px;font-weight:800;color:#2b3446;white-space:nowrap}
+.rdp-toggle{margin-left:0!important;white-space:nowrap}
+.rdp-toggle:first-of-type{margin-left:auto!important}
+.toolbar{flex-wrap:wrap}
+.toolbar .search{min-width:190px}
 .bar.Industrialisation{background:#b45309}.leg.indus{background:#b45309}
 .bar.task-production{background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.28) 0 5px,transparent 5px 10px)!important}.leg.prod{background:repeating-linear-gradient(135deg,#8993a5 0 2px,#d5dae3 2px 4px)}.type-badge.production{background:#fdecdc;color:#9a4508}.production-tag{color:#9a4508;font-weight:700}
 #rdpSaveBtn:disabled{opacity:.45;cursor:default}
@@ -646,7 +669,7 @@ body.rdp-readonly .bar,body.rdp-readonly .milestone{cursor:default}
             <option value="all">Toutes les phases</option>
             <option>Recherche</option><option>Prototype</option><option>Tests prototype</option><option>Tests à l'échelle</option><option>Supply</option><option>Industrialisation</option>
           </select>
-          <input type="checkbox" id="baselineToggle" hidden>
+          <select id="itemFilter" aria-label="Filtrer par item"><option value="all">Tous les items</option></select><label class="toggle rdp-toggle"><input type="checkbox" id="hideDone"><span></span>Masquer les tâches terminées</label><label class="toggle rdp-toggle"><input type="checkbox" id="blockView"><span></span>Vue par blocs</label><input type="checkbox" id="baselineToggle" hidden>
         </div>
 
         <div class="gantt-card">
@@ -752,7 +775,7 @@ body.rdp-readonly .bar,body.rdp-readonly .milestone{cursor:default}
       <fieldset class="allocation-box decision-optional"><legend>Allocation par personne</legend><div id="allocationEditor"></div><small class="field-help">Pourcentage du temps de travail consacré à cette tâche pendant sa réalisation.</small></fieldset>
       <label class="decision-optional">Compétences requises<select id="taskSkills" multiple size="5"></select><small class="field-help">Sélectionnez une ou plusieurs compétences. La liste se gère dans Paramètres.</small></label>
       <label class="decision-optional">Groupe / lot de travail<input id="taskGroup" list="groupList" placeholder="Ex. Carte de puissance, Validation, Supply"><datalist id="groupList"></datalist></label>
-      <label class="decision-optional">Dépend de<select id="taskDependency"><option value="">Aucune dépendance</option></select></label>
+      <label class="decision-optional">Dépend de<select id="taskDependency" multiple size="6"><option value="">Aucune dépendance</option></select><small class="field-help">Ctrl ou ⌘ pour en choisir plusieurs : la tâche démarre après la fin de la dernière.</small></label><label class="decision-optional">Items concernés<select id="taskItems" multiple size="4"></select><small class="field-help">Ctrl ou ⌘ pour en choisir plusieurs.</small></label>
       <label id="triggerField">Supply déclenchée<select id="taskTrigger"><option value="">Aucun bloc supply</option></select></label>
       <fieldset class="decision-checklist" id="decisionChecklist" hidden>
         <legend>Checklist de validation du jalon</legend>
@@ -811,6 +834,7 @@ bounds = function () {
 renderGantt = function () {
   const allTasks = tasks;
   tasks = allTasks.filter(task => parse(task.start) <= parse(PLANNING_END));
+  if (typeof window.rdpViewTasks === 'function') tasks = window.rdpViewTasks(tasks, allTasks);
   renderGanttBase();
   tasks = allTasks;
 };
@@ -2592,45 +2616,293 @@ $('#exportDataBtn').onclick = async () => {
     window.planningExportPayload = exportPayload;
     try { planningExportPayload = exportPayload; } catch (e) {}
     S.listeners.push(function () { scheduleDirtyCheck(); });
-    compactWeekLabelsSetup();
+    S.applying = true;
+    try { setupPlanningExtras(); } finally { S.applying = false; }
     st.booted = true;
   }
 
-  /* Vue « Semaines » sur un long horizon : un libellé toutes les N semaines pour rester lisible. */
-  function compactWeekLabels() {
-    var labels = document.querySelectorAll('#timelineHead .week-label');
-    if (!labels.length) return;
-    var head = q('#timelineHead');
-    var colW = head.clientWidth / labels.length;
-    var weekly = /^S\d+ · /.test(labels[0].textContent);
-    if (!weekly || colW >= 64) return;
-    var every = Math.max(1, Math.ceil(64 / Math.max(colW, 1)));
-    labels.forEach(function (el, i) {
-      var parts = el.textContent.split(' · ');
-      el.title = el.textContent;
-      el.style.whiteSpace = 'nowrap';
-      el.style.overflow = 'visible';
-      el.innerHTML = i % every === 0 ? esc(parts[0]) + '<br><span style="font-weight:400">' + esc(parts[1] || '') + '</span>' : '';
+  /* =====================================================================
+     Extensions du planning : dépendances multiples, items, filtres,
+     vue par blocs, frise des dates lisible.
+     ===================================================================== */
+  var ITEMS_DEFAULT = ['Module', 'Hat Building', 'Hat Pack Maker', 'Surge'];
+  var ITEM_RULES = [[/module/i, 'Module'], [/hat\s*building/i, 'Hat Building'], [/pack\s*maker|battery\s*maker/i, 'Hat Pack Maker'], [/surge/i, 'Surge']];
+  var ITEM_COLORS = ['#2563c9', '#0e7490', '#7c3aed', '#b45309', '#be185d', '#4d7c0f'];
+  var BLOCK_COLORS = ['#5277e8', '#18b98b', '#e5a43b', '#8a6be8', '#e66a72', '#0e7490', '#b45309', '#be185d'];
+  var VIEW_KEY = 'rdpilot.view';
+  var MONTHS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+
+  function itemList() { try { if (Array.isArray(config.items) && config.items.length) return config.items; } catch (e) {} return ITEMS_DEFAULT; }
+  function itemColor(name) { var i = itemList().indexOf(name); return ITEM_COLORS[(i < 0 ? 0 : i) % ITEM_COLORS.length]; }
+  function viewPrefs() { var v = readJSON(VIEW_KEY, {}); return { hideDone: !!v.hideDone, blocks: !!v.blocks, item: v.item || 'all' }; }
+  function setView(patch) { writeKey(VIEW_KEY, Object.assign(viewPrefs(), patch)); }
+  function pad2(n) { return String(n).padStart(2, '0'); }
+  function isoOf(d) { return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+  function shortDate(s) { var d = parse(s); return pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1); }
+  function longDate(s) { var d = parse(s); return d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear(); }
+  function exists(id) { return tasks.some(function (x) { return x.id == id; }); }
+  function allDeps(t) {
+    var ids = [];
+    if (t.dep !== '' && t.dep != null) ids.push(t.dep);
+    (Array.isArray(t.extraDeps) ? t.extraDeps : []).forEach(function (id) { if (ids.indexOf(id) < 0) ids.push(id); });
+    return ids.filter(function (id) { return id != t.id && exists(id); });
+  }
+  function inferItems(t) {
+    var found = [];
+    ITEM_RULES.forEach(function (r) { if (r[0].test(t.name || '') && itemList().indexOf(r[1]) >= 0 && found.indexOf(r[1]) < 0) found.push(r[1]); });
+    return found;
+  }
+  function normalizeTasks() {
+    tasks.forEach(function (t) {
+      if (!Array.isArray(t.extraDeps)) t.extraDeps = [];
+      if (!Array.isArray(t.items)) t.items = inferItems(t);
+    });
+    tasks.forEach(function (t) {
+      if (!t.items.length && t.hostId) { var h = tasks.find(function (x) { return x.id == t.hostId; }); if (h && h.items && h.items.length) t.items = h.items.slice(); }
     });
   }
-  function tagProduction() {
-    document.querySelectorAll('.task-cell[data-id]').forEach(function (cell) {
+
+  // Une tâche démarre après la fin de la DERNIÈRE de ses dépendances (+ décalage).
+  function installCascade() {
+    var cascade = function () {
+      var changed = false, pass = 0;
+      do {
+        changed = false; pass += 1;
+        tasks.forEach(function (task) {
+          task.durationDays = Math.max(1, Number(task.durationDays) || 1);
+          if (!Array.isArray(task.extraDeps)) task.extraDeps = [];
+          task.extraDeps = task.extraDeps.filter(function (id) { return id != task.id && exists(id); });
+          var preds = allDeps(task).map(function (id) { return tasks.find(function (x) { return x.id == id; }); }).filter(Boolean);
+          if (!preds.length) return;
+          var maxEnd = preds.reduce(function (m, p) { return p.end > m ? p.end : m; }, preds[0].end);
+          var es = datePlusDays(maxEnd, 1 + Math.max(0, Number(task.lagDays) || 0));
+          var ee = datePlusDays(es, task.durationDays - 1);
+          if (task.start !== es || task.end !== ee) { task.start = es; task.end = ee; changed = true; }
+        });
+      } while (changed && pass <= tasks.length);
+      return pass <= tasks.length;
+    };
+    window.cascadeDependencies = cascade;
+    try { cascadeDependencies = cascade; } catch (e) {}
+  }
+
+  // Filtres et ordre d'affichage (appelé par le Gantt avant de dessiner les lignes).
+  var blockInfo = {};
+  function blockOrder(list, all) {
+    var parent = {};
+    function find(x) { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; }
+    function join(a, b) { if (parent[a] === undefined || parent[b] === undefined) return; a = find(a); b = find(b); if (a !== b) parent[a] = b; }
+    all.forEach(function (t) { parent[String(t.id)] = String(t.id); });
+    all.forEach(function (t) {
+      allDeps(t).forEach(function (id) { join(String(t.id), String(id)); });
+      [t.trigger, t.triggeredBy, t.hostId].forEach(function (id) { if (id !== '' && id != null) join(String(t.id), String(id)); });
+    });
+    var size = {};
+    all.forEach(function (t) { var r = find(String(t.id)); size[r] = (size[r] || 0) + 1; });
+    var groups = {}, singles = [];
+    list.forEach(function (t) { var r = find(String(t.id)); if (size[r] > 1) (groups[r] = groups[r] || []).push(t); else singles.push(t); });
+    var byStart = function (a, b) { return a.start < b.start ? -1 : a.start > b.start ? 1 : (a.order || 0) - (b.order || 0); };
+    var blocks = Object.keys(groups).map(function (r) { return groups[r].sort(byStart); }).sort(function (a, b) { return byStart(a[0], b[0]); });
+    blockInfo = {};
+    var out = [];
+    blocks.forEach(function (bl, i) {
+      var first = bl[0], last = bl.reduce(function (m, t) { return t.end > m ? t.end : m; }, bl[0].end);
+      bl.forEach(function (t, j) { blockInfo[t.id] = { index: i, head: j === 0, count: bl.length, first: first, end: last }; out.push(t); });
+    });
+    singles.sort(byStart).forEach(function (t, j) { blockInfo[t.id] = { index: -1, head: j === 0, count: singles.length }; out.push(t); });
+    return out;
+  }
+  window.rdpViewTasks = function (list, all) {
+    var v = viewPrefs();
+    var out = list.filter(function (t) {
+      if (v.hideDone && Number(t.progress) >= 100) return false;
+      var items = Array.isArray(t.items) ? t.items : [];
+      if (v.item === 'none') return !items.length;
+      if (v.item !== 'all') return items.indexOf(v.item) >= 0;
+      return true;
+    });
+    blockInfo = {};
+    return v.blocks ? blockOrder(out, all || list) : out;
+  };
+
+  // Frise lisible : mois + semaines (numéro et lundi) + sprints + aujourd'hui.
+  function buildTimeline() {
+    var card = q('.gantt-card'), head = q('#timelineHead'), body = q('#ganttBody');
+    if (!card || !head || !body) return;
+    var b = bounds();
+    var week = zoom === 'week';
+    var tl = week ? Math.max(780, Math.round(b.total / 7 * 54)) : 780;
+    card.style.setProperty('--rdp-tl', tl + 'px');
+    var startD = new Date(b.min), endD = new Date(b.max), html = '';
+    var m = new Date(startD.getFullYear(), startD.getMonth(), 1), months = [];
+    while (m <= endD) {
+      var next = new Date(m.getFullYear(), m.getMonth() + 1, 1);
+      var l = pct(isoOf(m), b), r = next > endD ? 100 : pct(isoOf(next), b);
+      if (r > l) {
+        var label = MONTHS[m.getMonth()] + ' ' + m.getFullYear();
+        html += '<div class="rdp-mon' + (week ? '' : ' rdp-mon-tall') + '" style="left:' + l + '%;width:' + (r - l) + '%"><span>' + label + '</span></div>';
+      }
+      if (l > 0) months.push(l);
+      m = next;
+    }
+    if (week) {
+      var d = new Date(startD); while (d.getDay() !== 1) d.setDate(d.getDate() + 1);
+      var firstMonday = new Date(d);
+      var pxWeek = head.clientWidth * 7 / b.total, every = pxWeek >= 44 ? 1 : Math.ceil(44 / Math.max(pxWeek, 1)), i = 0;
+      while (d <= endD) {
+        var minor = i % every !== 0;
+        html += '<div class="rdp-wk' + (minor ? ' rdp-wk-minor' : '') + '" style="left:' + pct(isoOf(d), b) + '%">' +
+          (minor ? '' : '<b>S' + weekNo(d) + '</b><span>' + d.getDate() + '/' + (d.getMonth() + 1) + '</span>') + '</div>';
+        d.setDate(d.getDate() + 7); i++;
+      }
+      var row = body.querySelector('.timeline-row');
+      if (row) {
+        var pxd = row.clientWidth / b.total;
+        var off = Math.round((firstMonday - startD) / DAY) * pxd;
+        body.style.setProperty('--rdp-wk', (7 * pxd) + 'px');
+        body.style.setProperty('--rdp-wk0', off + 'px');
+      }
+      body.classList.remove('rdp-nogrid');
+    } else {
+      body.classList.add('rdp-nogrid');
+    }
+    if (config && config.sprintStart && config.sprintDays) {
+      var sp = parse(config.sprintStart), n = 1;
+      while (sp < b.min) { sp = new Date(sp.getTime() + config.sprintDays * DAY); n++; }
+      while (sp <= b.max) { html += '<div class="rdp-sprint" style="left:' + pct(isoOf(sp), b) + '%">Sprint ' + n + '</div>'; sp = new Date(sp.getTime() + config.sprintDays * DAY); n++; }
+    }
+    var today = isoOf(new Date());
+    html += '<div class="rdp-today" style="left:' + pct(today, b) + '%">Aujourd’hui</div>';
+    head.innerHTML = html;
+    head.classList.add('rdp-head');
+    body.querySelectorAll('.timeline-row').forEach(function (r) {
+      r.querySelectorAll('.rdp-mline').forEach(function (x) { x.remove(); });
+      months.forEach(function (p) { r.insertAdjacentHTML('afterbegin', '<i class="rdp-mline" style="left:' + p + '%"></i>'); });
+    });
+  }
+
+  function decorateRows() {
+    var v = viewPrefs();
+    document.querySelectorAll('#ganttBody .task-cell[data-id]').forEach(function (cell) {
       var t = tasks.find(function (x) { return x.id == cell.dataset.id; });
       var meta = cell.querySelector('.task-meta');
-      if (!t || !meta || t.type !== 'production' || meta.querySelector('.production-tag')) return;
-      meta.insertAdjacentHTML('beforeend', '<span class="production-tag">Production</span>');
+      if (!t || !meta) return;
+      if (t.type === 'production' && !meta.querySelector('.production-tag')) meta.insertAdjacentHTML('beforeend', '<span class="production-tag">Production</span>');
+      var extra = allDeps(t).slice(1).map(function (id) { var p = tasks.find(function (x) { return x.id == id; }); return p ? p.name : ''; }).filter(Boolean);
+      if (extra.length && !meta.querySelector('.rdp-more-deps')) meta.insertAdjacentHTML('beforeend', '<span class="dependency-chip rdp-more-deps" title="Aussi après : ' + esc(extra.join(' ; ')) + '">+' + extra.length + ' dépendance' + (extra.length > 1 ? 's' : '') + '</span>');
+      (t.items || []).forEach(function (it) { meta.insertAdjacentHTML('beforeend', '<span class="rdp-item" style="--c:' + itemColor(it) + '">' + esc(it) + '</span>'); });
+      if (!meta.querySelector('.rdp-dates')) meta.insertAdjacentHTML('afterbegin', '<span class="rdp-dates">' + (t.milestone ? 'le ' + shortDate(t.start) : shortDate(t.start) + ' → ' + shortDate(t.end)) + '</span>');
+    });
+    document.querySelectorAll('#ganttBody .bar[data-id], #ganttBody .milestone[data-id]').forEach(function (el) {
+      var t = tasks.find(function (x) { return x.id == el.dataset.id; });
+      if (!t) return;
+      el.title = (t.milestone ? 'Le ' + longDate(t.start) : 'Du ' + longDate(t.start) + ' au ' + longDate(t.end) + ' (' + t.durationDays + ' j)') + (st.canWrite ? ' · glisser pour déplacer' : '');
+    });
+    if (!v.blocks) return;
+    var shown = {};
+    document.querySelectorAll('#ganttBody .gantt-row').forEach(function (row) {
+      var cell = row.querySelector('.task-cell[data-id]');
+      var info = cell && blockInfo[cell.dataset.id];
+      if (!info) return;
+      row.draggable = false;
+      var h = row.querySelector('.drag-handle'); if (h) h.remove();
+      var color = info.index < 0 ? '#c3cad6' : BLOCK_COLORS[info.index % BLOCK_COLORS.length];
+      cell.style.boxShadow = 'inset 4px 0 0 ' + color;
+      var key = String(info.index);
+      if (shown[key]) return;
+      shown[key] = true;
+      var text = info.index < 0 ? 'Tâches sans dépendance · ' + info.count
+        : 'Bloc ' + (info.index + 1) + ' · ' + info.count + ' tâches liées · ' + shortDate(info.first.start) + ' → ' + shortDate(info.end) + ' · depuis « ' + info.first.name + ' »';
+      row.insertAdjacentHTML('beforebegin', '<div class="rdp-block-head" style="--c:' + color + '"><span>' + esc(text) + '</span></div>');
     });
   }
-  function compactWeekLabelsSetup() {
-    var base = window.renderGantt;
-    if (typeof base !== 'function') return;
-    var wrapped = function () { var r = base.apply(this, arguments); try { compactWeekLabels(); } catch (e) {} try { tagProduction(); } catch (e) {} return r; };
-    window.renderGantt = wrapped;
-    try { renderGantt = wrapped; } catch (e) {}
-    try { compactWeekLabels(); } catch (e) {}
-    try { tagProduction(); } catch (e) {}
-    window.addEventListener('resize', function () { try { renderGantt(); } catch (e) {} });
+
+  function postRender() {
+    try { buildTimeline(); } catch (e) { console.warn(e); }
+    try { decorateRows(); } catch (e) { console.warn(e); }
   }
+
+  function scrollToToday() {
+    var card = q('.gantt-card'), line = card && card.querySelector('.today-line');
+    if (!card || !line) return;
+    var x = line.getBoundingClientRect().left - card.getBoundingClientRect().left + card.scrollLeft;
+    var col = q('.task-head') ? q('.task-head').offsetWidth : 360;
+    card.scrollLeft = Math.max(0, x - col - 160);
+  }
+
+  function setupToolbar() {
+    var sel = q('#itemFilter');
+    if (sel) {
+      sel.innerHTML = '<option value="all">Tous les items</option>' + itemList().map(function (it) { return '<option value="' + esc(it) + '">' + esc(it) + '</option>'; }).join('') + '<option value="none">Sans item</option>';
+      sel.value = viewPrefs().item;
+      if (sel.value !== viewPrefs().item) sel.value = 'all';
+      sel.onchange = function () { setView({ item: sel.value }); renderGantt(); };
+    }
+    var hd = q('#hideDone'); if (hd) { hd.checked = viewPrefs().hideDone; hd.onchange = function () { setView({ hideDone: hd.checked }); renderGantt(); }; }
+    var bv = q('#blockView'); if (bv) { bv.checked = viewPrefs().blocks; bv.onchange = function () { setView({ blocks: bv.checked }); renderGantt(); }; }
+    var tb = q('#todayBtn'); if (tb) tb.onclick = scrollToToday;
+    document.querySelectorAll('.zoom').forEach(function (z) { z.addEventListener('click', function () { setTimeout(scrollToToday, 50); }); });
+  }
+
+  // Fiche de tâche : plusieurs dépendances + items concernés.
+  function setupDialog() {
+    var baseOpen = window.openTask;
+    var open = function (id) {
+      var r = baseOpen.apply(this, arguments);
+      try {
+        var t = tasks.find(function (x) { return x.id === id; });
+        var ids = t ? allDeps(t).map(String) : [];
+        var dsel = q('#taskDependency');
+        if (dsel) Array.prototype.forEach.call(dsel.options, function (o) { o.selected = o.value ? ids.indexOf(o.value) >= 0 : !ids.length; });
+        var isel = q('#taskItems');
+        if (isel) {
+          var mine = t ? (t.items || []) : (viewPrefs().item !== 'all' && viewPrefs().item !== 'none' ? [viewPrefs().item] : []);
+          isel.innerHTML = itemList().map(function (it) { return '<option value="' + esc(it) + '"' + (mine.indexOf(it) >= 0 ? ' selected' : '') + '>' + esc(it) + '</option>'; }).join('');
+        }
+      } catch (e) {}
+      return r;
+    };
+    window.openTask = open;
+    try { openTask = open; } catch (e) {}
+    var form = q('#taskForm');
+    if (!form) return;
+    form.addEventListener('submit', function () {
+      var dsel = q('#taskDependency'), isel = q('#taskItems');
+      var ids = dsel ? Array.prototype.filter.call(dsel.options, function (o) { return o.selected && o.value; }).map(function (o) { return Number(o.value); }) : [];
+      var items = isel ? Array.prototype.filter.call(isel.options, function (o) { return o.selected; }).map(function (o) { return o.value; }) : [];
+      var editedId = +q('#taskId').value, editedName = q('#taskName').value;
+      setTimeout(function () {
+        var t = tasks.find(function (x) { return x.id === editedId; }) || tasks.slice().reverse().find(function (x) { return x.name === editedName; });
+        if (!t) return;
+        ids = ids.filter(function (id) { return id != t.id; });
+        if (t.keyStep) { t.dep = ''; t.extraDeps = []; }
+        else { t.dep = ids.length ? ids[0] : ''; t.extraDeps = ids.slice(1); }
+        t.items = items;
+        persist();
+        render();
+      }, 30);
+    }, true);
+  }
+
+  function setupPlanningExtras() {
+    normalizeTasks();
+    installCascade();
+    try { cascadeDependencies(); } catch (e) {}
+    var base = window.renderGantt;
+    if (typeof base === 'function') {
+      var wrapped = function () { var r = base.apply(this, arguments); postRender(); return r; };
+      window.renderGantt = wrapped;
+      try { renderGantt = wrapped; } catch (e) {}
+    }
+    setupToolbar();
+    setupDialog();
+    try { render(); } catch (e) {}
+    try { if (typeof renderSpecs === 'function') renderSpecs(); } catch (e) {}
+    var rt = null;
+    window.addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(function () { try { renderGantt(); } catch (e) {} }, 150); });
+    setTimeout(scrollToToday, 80);
+  }
+
   function corePayload() {
     var p = origExportPayload ? origExportPayload() : Object.assign({ format: 'rdpilot-data', version: 1 }, localCore());
     return { team: p.team, tasks: p.tasks, config: p.config, skillCatalog: p.skillCatalog, specStatuses: p.specStatuses };
