@@ -29,6 +29,9 @@ const RDP_CONFIG = {
   // Permissions Microsoft Graph demandées (déléguées).
   SCOPES: ['User.Read', 'Files.ReadWrite.All'],
 
+  // Dernière date affichée sur le Gantt (format AAAA-MM-JJ).
+  PLANNING_END: '2027-06-30',
+
   // Vérification des modifications faites par les autres (en secondes).
   REFRESH_SECONDS: 60,
 
@@ -555,6 +558,7 @@ const RDP_CONFIG = {
 #rdpUserMobile{display:none}
 #rdpUserMobile button{border:0;background:transparent;color:#167457;font-size:11px;font-weight:700;cursor:pointer;padding:0 0 0 8px}
 @media (max-width:900px){.rdp-user{display:none!important}#rdpUserMobile:not([hidden]){display:inline-block}}
+.bar.Industrialisation{background:#b45309}.leg.indus{background:#b45309}
 #rdpSaveBtn:disabled{opacity:.45;cursor:default}
 .rdp-banner{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:#fff5dc;color:#7a5608;border:1px solid #f1dca0;border-radius:10px;padding:10px 14px;margin:0 0 14px;font-size:13px}
 .rdp-banner[hidden]{display:none!important}
@@ -639,7 +643,7 @@ body.rdp-readonly .bar,body.rdp-readonly .milestone{cursor:default}
           <label class="search"><span>⌕</span><input id="searchInput" placeholder="Rechercher tâche, skill…"></label>
           <select id="phaseFilter" aria-label="Filtrer par phase">
             <option value="all">Toutes les phases</option>
-            <option>Recherche</option><option>Prototype</option><option>Tests prototype</option><option>Tests à l'échelle</option><option>Supply</option>
+            <option>Recherche</option><option>Prototype</option><option>Tests prototype</option><option>Tests à l'échelle</option><option>Supply</option><option>Industrialisation</option>
           </select>
           <input type="checkbox" id="baselineToggle" hidden>
         </div>
@@ -651,7 +655,7 @@ body.rdp-readonly .bar,body.rdp-readonly .milestone{cursor:default}
           </div>
           <div id="ganttBody"></div>
         </div>
-        <div class="legend"><span><i class="leg research"></i>Recherche</span><span><i class="leg prototype"></i>Prototype</span><span><i class="leg test"></i>Tests</span><span><i class="leg scale"></i>Échelle</span><span><i class="diamond"></i>Jalon TRL</span><span><i class="diamond keystep"></i>Étape clé</span></div>
+        <div class="legend"><span><i class="leg research"></i>Recherche</span><span><i class="leg prototype"></i>Prototype</span><span><i class="leg test"></i>Tests</span><span><i class="leg scale"></i>Échelle</span><span><i class="leg indus"></i>Industrialisation</span><span><i class="diamond"></i>Jalon TRL</span><span><i class="diamond keystep"></i>Étape clé</span></div>
       </section>
 
       <section id="capacityView" hidden>
@@ -735,8 +739,8 @@ body.rdp-readonly .bar,body.rdp-readonly .milestone{cursor:default}
       <label>Nom de la tâche<input id="taskName" required></label>
       <div class="form-grid">
         <label>Type<select id="taskType"><option value="research">Recherche</option><option value="development">Développement</option><option value="supply">Bloc supply</option><option value="decision">Jalon de décision</option></select></label>
-        <label class="decision-optional">Équipe<select id="taskTeam"><option>R&amp;D</option><option>Test</option><option>Mechanical Design</option></select></label>
-        <label class="decision-optional">Phase<select id="taskPhase"><option>Recherche</option><option>Prototype</option><option>Tests prototype</option><option>Tests à l'échelle</option><option>Supply</option></select></label>
+        <label class="decision-optional">Équipe<select id="taskTeam"><option>R&amp;D</option><option>Test</option><option>Mechanical Design</option><option>Industrialisation</option></select></label>
+        <label class="decision-optional">Phase<select id="taskPhase"><option>Recherche</option><option>Prototype</option><option>Tests prototype</option><option>Tests à l'échelle</option><option>Supply</option><option>Industrialisation</option></select></label>
         <label class="decision-optional">Avancement (%)<input id="taskProgress" type="number" min="0" max="100" value="0"></label>
         <label class="date-field">Début calculé<input id="taskStart" type="date" required></label>
         <label class="date-field">Fin calculée<input id="taskEnd" type="date" required></label>
@@ -770,7 +774,7 @@ const seedTeam=[];
 const seedTasks=[];
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)],parse=s=>new Date(s+'T00:00:00'),fmt=d=>d.toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
 let team=JSON.parse(localStorage.getItem('rdpilot.team')||'null')||structuredClone(seedTeam);let tasks=(JSON.parse(localStorage.getItem('rdpilot.tasks')||'null')||structuredClone(seedTasks)).map(t=>({...t,type:t.type||(t.milestone?'decision':'activity')}));let config=JSON.parse(localStorage.getItem('rdpilot.config')||'null')||{sprintStart:'2026-09-14',sprintDays:7};let zoom='week',showBaseline=true;
-function initialsFor(n){return n.split(/\s+/).map(x=>x[0]).join('').slice(0,2).toUpperCase()||'NA'}function persist(){localStorage.setItem('rdpilot.tasks',JSON.stringify(tasks));localStorage.setItem('rdpilot.team',JSON.stringify(team));localStorage.setItem('rdpilot.config',JSON.stringify(config))}function person(id){return team.find(x=>x.id===id)||team[0]||{name:'Non affecté',initials:'—',color:'#8993a5',capacity:35,skills:[]}}function loadFor(id){return tasks.filter(t=>t.owner===id&&t.progress<100).reduce((a,t)=>a+t.hours,0)}function phaseClass(p){return p.replaceAll(' ','').replaceAll("'",'')}function bounds(){let dates=tasks.flatMap(t=>[parse(t.start),parse(t.end)]),min=new Date(Math.min(...dates)),max=new Date(Math.max(...dates));min.setDate(min.getDate()-7);max.setDate(max.getDate()+10);return{min,max,total:Math.max(1,Math.round((max-min)/DAY))}}function pct(date,b){return Math.max(0,Math.min(100,(parse(date)-b.min)/DAY/b.total*100))}function phaseColor(p){return({'Recherche':'#5277e8','Prototype':'#18b98b','Tests prototype':'#e5a43b',"Tests à l'échelle":'#8a6be8','Supply':'#27334d'})[p]||'#8993a5'}
+function initialsFor(n){return n.split(/\s+/).map(x=>x[0]).join('').slice(0,2).toUpperCase()||'NA'}function persist(){localStorage.setItem('rdpilot.tasks',JSON.stringify(tasks));localStorage.setItem('rdpilot.team',JSON.stringify(team));localStorage.setItem('rdpilot.config',JSON.stringify(config))}function person(id){return team.find(x=>x.id===id)||team[0]||{name:'Non affecté',initials:'—',color:'#8993a5',capacity:35,skills:[]}}function loadFor(id){return tasks.filter(t=>t.owner===id&&t.progress<100).reduce((a,t)=>a+t.hours,0)}function phaseClass(p){return p.replaceAll(' ','').replaceAll("'",'')}function bounds(){let dates=tasks.flatMap(t=>[parse(t.start),parse(t.end)]),min=new Date(Math.min(...dates)),max=new Date(Math.max(...dates));min.setDate(min.getDate()-7);max.setDate(max.getDate()+10);return{min,max,total:Math.max(1,Math.round((max-min)/DAY))}}function pct(date,b){return Math.max(0,Math.min(100,(parse(date)-b.min)/DAY/b.total*100))}function phaseColor(p){return({'Recherche':'#5277e8','Prototype':'#18b98b','Tests prototype':'#e5a43b',"Tests à l'échelle":'#8a6be8','Supply':'#27334d','Industrialisation':'#b45309'})[p]||'#8993a5'}
 function render(){renderTeam();renderKpis();renderGantt();renderCapacity();renderSettings()}function renderTeam(){$('#teamMini').innerHTML='<p class="eyebrow">ÉQUIPE · '+team.length+'</p>'+team.slice(0,4).map(p=>`<div class="mini-row"><i class="avatar" style="background:${p.color}">${p.initials}</i><span>${p.name}</span><small>${loadFor(p.id)}h</small></div>`).join('')}function renderKpis(){let late=tasks.filter(t=>parse(t.end)>parse(t.baseEnd)&&t.progress<100).length,progress=Math.round(tasks.reduce((a,t)=>a+t.progress,0)/tasks.length),overload=team.filter(p=>loadFor(p.id)>p.capacity).length,trl=tasks.filter(t=>t.milestone&&t.progress===100).length+3;$('#kpis').innerHTML=[['Avancement global',progress+'%','pondération simple'],['Décalages',late,late?'tâches vs baseline':'planning tenu'],['Charge critique',overload,overload?'membre(s) surchargé(s)':'capacité disponible'],['Niveau actuel','TRL '+trl,'objectif : TRL 5']].map((k,i)=>`<div class="kpi"><div class="kpi-label">${k[0]}</div><div class="kpi-value">${k[1]}</div><div class="kpi-note ${i===1&&late?'alert':''}">${k[2]}</div></div>`).join('')}
 function sprintLines(b){let d=parse(config.sprintStart),i=1,out='';while(d<b.min)d=new Date(d.getTime()+config.sprintDays*DAY);while(d<=b.max){out+=`<i class="sprint-line" data-sprint="${i++}" style="left:${pct(d.toISOString().slice(0,10),b)}%"></i>`;d=new Date(d.getTime()+config.sprintDays*DAY)}return out}
 function renderGantt(){let q=$('#searchInput').value.toLowerCase(),phase=$('#phaseFilter').value,list=tasks.filter(t=>(phase==='all'||t.phase===phase)&&(!q||(t.name+' '+t.skills.join(' ')).toLowerCase().includes(q))),b=bounds(),start=new Date(b.min),cols=zoom==='week'?Math.ceil(b.total/7):Math.ceil(b.total/30);$('#timelineHead').style.gridTemplateColumns=`repeat(${cols},1fr)`;$('#timelineHead').innerHTML=Array.from({length:cols},(_,i)=>{let d=new Date(start);d.setDate(d.getDate()+i*(zoom==='week'?7:30));return `<div class="week-label">${zoom==='week'?'S'+weekNo(d)+' · ':''}${fmt(d)}</div>`}).join('');$('#taskCount').textContent='· '+list.length;$('#ganttBody').innerHTML=list.map(t=>{let p=person(t.owner),left=pct(t.start,b),width=Math.max(t.milestone?1.2:pct(t.end,b)-left+100/b.total),bl=pct(t.baseStart,b),bw=Math.max(1,pct(t.baseEnd,b)-bl+100/b.total),locked=t.type==='supply'&&t.triggeredBy&&tasks.find(x=>x.id==t.triggeredBy)?.progress<100,label=locked?'En attente GO':t.progress+'%';return `<div class="gantt-row"><div class="task-cell" data-id="${t.id}"><div><div class="task-title">${t.name}</div><div class="task-meta"><span><i class="phase-dot" style="background:${phaseColor(t.phase)}"></i> ${t.phase}</span><span>${t.hours}h/sem.</span>${t.type==='decision'?'<span class="decision-tag">Décision</span>':''}${t.type==='supply'?'<span class="supply-tag">Supply</span>':''}</div></div><div class="owner-cell"><i class="avatar" style="background:${p.color}">${p.initials}</i>${p.name}</div><div class="expand">›</div></div><div class="timeline-row">${sprintLines(b)}<i class="today-line" style="left:${pct(new Date().toLocaleDateString('sv-SE'),b)}%"></i>${showBaseline?`<i class="baseline" style="left:${bl}%;width:${bw}%"></i>`:''}${t.milestone?`<i class="milestone ${t.type==='decision'?'decision':''}" data-id="${t.id}" style="left:${left}%"></i>`:`<div class="bar ${phaseClass(t.phase)} ${locked?'supply-locked':''}" data-id="${t.id}" style="left:${left}%;width:${width}%"><i class="progress-fill" style="width:${t.progress}%"></i><em>${label}</em></div>`}</div></div>`}).join('');$$('[data-id]').forEach(el=>el.onclick=()=>openTask(+el.dataset.id))}
@@ -788,7 +792,7 @@ $('#addTaskBtn').onclick=()=>openTask();$('#addSupplyBtn').onclick=()=>openTask(
 
   </script>
   <script type="text/x-rdpilot-app">
-const PLANNING_END = '2026-12-31';
+const PLANNING_END = (typeof RDP_CONFIG !== 'undefined' && RDP_CONFIG.PLANNING_END) || '2027-06-30';
 const renderGanttBase = renderGantt;
 
 bounds = function () {
@@ -814,7 +818,7 @@ renderGantt();
 
   </script>
   <script type="text/x-rdpilot-app">
-const TEAM_GROUPS = ['R&D', 'Test', 'Mechanical Design'];
+const TEAM_GROUPS = ['R&D', 'Test', 'Mechanical Design', 'Industrialisation'];
 
 tasks.forEach(task => {
   if (task.type === 'activity') {
@@ -1588,7 +1592,7 @@ function weeklyLoad(memberId, weekStart) {
 function loadWeeks() {
   const weeks = [];
   const current = parse(config.sprintStart || '2026-09-14');
-  const finish = parse('2026-12-31');
+  const finish = parse(PLANNING_END);
   while (current <= finish) {
     weeks.push(new Date(current));
     current.setDate(current.getDate() + 7);
@@ -2586,7 +2590,35 @@ $('#exportDataBtn').onclick = async () => {
     window.planningExportPayload = exportPayload;
     try { planningExportPayload = exportPayload; } catch (e) {}
     S.listeners.push(function () { scheduleDirtyCheck(); });
+    compactWeekLabelsSetup();
     st.booted = true;
+  }
+
+  /* Vue « Semaines » sur un long horizon : un libellé toutes les N semaines pour rester lisible. */
+  function compactWeekLabels() {
+    var labels = document.querySelectorAll('#timelineHead .week-label');
+    if (!labels.length) return;
+    var head = q('#timelineHead');
+    var colW = head.clientWidth / labels.length;
+    var weekly = /^S\d+ · /.test(labels[0].textContent);
+    if (!weekly || colW >= 64) return;
+    var every = Math.max(1, Math.ceil(64 / Math.max(colW, 1)));
+    labels.forEach(function (el, i) {
+      var parts = el.textContent.split(' · ');
+      el.title = el.textContent;
+      el.style.whiteSpace = 'nowrap';
+      el.style.overflow = 'visible';
+      el.innerHTML = i % every === 0 ? esc(parts[0]) + '<br><span style="font-weight:400">' + esc(parts[1] || '') + '</span>' : '';
+    });
+  }
+  function compactWeekLabelsSetup() {
+    var base = window.renderGantt;
+    if (typeof base !== 'function') return;
+    var wrapped = function () { var r = base.apply(this, arguments); try { compactWeekLabels(); } catch (e) {} return r; };
+    window.renderGantt = wrapped;
+    try { renderGantt = wrapped; } catch (e) {}
+    try { compactWeekLabels(); } catch (e) {}
+    window.addEventListener('resize', function () { try { renderGantt(); } catch (e) {} });
   }
   function corePayload() {
     var p = origExportPayload ? origExportPayload() : Object.assign({ format: 'rdpilot-data', version: 1 }, localCore());
