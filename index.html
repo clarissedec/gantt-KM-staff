@@ -2625,8 +2625,9 @@ $('#exportDataBtn').onclick = async () => {
      Extensions du planning : dépendances multiples, items, filtres,
      vue par blocs, frise des dates lisible.
      ===================================================================== */
-  var ITEMS_DEFAULT = ['Module', 'Hat Building', 'Hat Pack Maker', 'Surge'];
-  var ITEM_RULES = [[/module/i, 'Module'], [/hat\s*building/i, 'Hat Building'], [/pack\s*maker|battery\s*maker/i, 'Hat Pack Maker'], [/surge/i, 'Surge']];
+  var ITEMS_DEFAULT = ['Module', 'Carte Core Product', 'Hat Building', 'Hat Pack Maker', 'Surge'];
+  var CORE_RULE = /core\s*product|carte\s*v0/i;
+  var ITEM_RULES = [[/module/i, 'Module'], [CORE_RULE, 'Carte Core Product'], [/hat\s*building/i, 'Hat Building'], [/pack\s*maker|battery\s*maker/i, 'Hat Pack Maker'], [/surge/i, 'Surge']];
   var ITEM_COLORS = ['#2563c9', '#0e7490', '#7c3aed', '#b45309', '#be185d', '#4d7c0f'];
   var BLOCK_COLORS = ['#5277e8', '#18b98b', '#e5a43b', '#8a6be8', '#e66a72', '#0e7490', '#b45309', '#be185d'];
   var VIEW_KEY = 'rdpilot.view';
@@ -2657,6 +2658,13 @@ $('#exportDataBtn').onclick = async () => {
       if (!Array.isArray(t.extraDeps)) t.extraDeps = [];
       if (!Array.isArray(t.items)) t.items = inferItems(t);
     });
+    // Ajout de l'item « Carte Core Product » (une seule fois, sur les données existantes).
+    try {
+      if ((Number(config.itemsVersion) || 0) < 2) {
+        tasks.forEach(function (t) { if (CORE_RULE.test(t.name || '') && t.items.indexOf('Carte Core Product') < 0) t.items.push('Carte Core Product'); });
+        config.itemsVersion = 2;
+      }
+    } catch (e) {}
     tasks.forEach(function (t) {
       if (!t.items.length && t.hostId) { var h = tasks.find(function (x) { return x.id == t.hostId; }); if (h && h.items && h.items.length) t.items = h.items.slice(); }
     });
