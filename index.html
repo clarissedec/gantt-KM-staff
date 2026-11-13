@@ -589,6 +589,39 @@ const RDP_CONFIG = {
 .rdp-multidep-tag{color:#b91c1c;background:#fde8e8;border-radius:6px;padding:0 6px;font-weight:800;font-size:10px;line-height:16px}
 .task-cell.rdp-multidep-cell{background:#fff7f7}
 .leg.multidep{background:transparent;outline:2px dashed #dc2626;outline-offset:1px}
+#benchView .rdp-bench-top{display:flex;justify-content:space-between;align-items:end;gap:16px;margin-bottom:14px;flex-wrap:wrap}
+#benchView h2{margin:0;font-size:20px}
+.rdp-bench-legend{display:flex;gap:14px;font-size:11px;color:var(--muted)}
+.rdp-bench-legend span{display:flex;gap:6px;align-items:center}
+.rdp-bench-legend i{width:14px;height:10px;border-radius:3px;display:inline-block;border:1px solid #d5dae3}
+.rdp-bench-wrap{background:#fff;border:1px solid var(--line);border-radius:10px;overflow:auto;max-height:calc(100vh - 300px);margin-bottom:16px}
+.rdp-bench-table{border-collapse:separate;border-spacing:0;font-size:11px}
+.rdp-bench-table th,.rdp-bench-table td{border-right:1px solid #edf0f4;border-bottom:1px solid #edf0f4}
+.rdp-bench-name{position:sticky;left:0;z-index:2;background:#fff;min-width:200px;max-width:220px;text-align:left;padding:8px 12px}
+.rdp-bench-name strong{display:block;font-size:12px;color:var(--ink)}
+.rdp-bench-name small{color:var(--muted);font-weight:500}
+thead .rdp-bench-name,.rdp-bench-corner{background:#f9fafc;z-index:4;top:0;position:sticky}
+.rdp-bench-month{position:sticky;top:0;z-index:3;background:#f1f4f8;text-align:left;padding:4px 7px;font-weight:750;color:#2b3446;text-transform:capitalize}
+.rdp-bench-week{position:sticky;top:23px;z-index:3;background:#f9fafc;min-width:74px;padding:3px 5px;text-align:left;font-weight:500;color:var(--muted);line-height:1.2}
+.rdp-bench-week b{display:block;color:#3d4658}
+.rdp-bench-cell{height:46px;min-width:74px;max-width:74px;padding:3px 5px;cursor:pointer;vertical-align:middle;line-height:1.2;overflow:hidden;font-weight:650}
+.rdp-c-free{background:#f3fbf7}.rdp-bench-cell.rdp-c-free:hover{background:#e3f6ec}
+.rdp-c-task{background:#dbe6fb;color:#1e3a8a}
+.rdp-c-book{background:#fdeccf;color:#7a4a05}
+.rdp-c-conflict{background:#fde2e2;color:#991b1b;box-shadow:inset 0 0 0 2px #dc2626}
+.rdp-now{border-left:2px solid #ef5964!important}
+.rdp-bench-empty{margin-bottom:16px;color:var(--muted)}
+.rdp-bench-admin{max-width:640px}
+.rdp-bench-row{display:grid;grid-template-columns:1fr 170px 34px;gap:8px;margin-bottom:8px}
+.rdp-bench-row input,.rdp-bench-row select{border:1px solid var(--line);border-radius:7px;padding:8px}
+.rdp-usages{display:grid;gap:8px;margin-bottom:12px}
+.rdp-usage{display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:center;border-radius:8px;padding:9px 11px;border:1px solid #e3e7ee}
+.rdp-usage span{grid-column:1;font-size:11px;font-weight:500;opacity:.85}
+.rdp-usage button{grid-column:2;grid-row:1 / span 2}
+.rdp-conflict-note{color:#b91c1c;font-weight:700;font-size:12px;margin:0 0 12px}
+.rdp-book-form{border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.rdp-book-form legend{font-size:12px;font-weight:750;padding:0 6px}
+.rdp-bench-chip{color:#475569;border:1px dashed #94a3b8;border-radius:6px;padding:0 5px;font-weight:700;font-size:10px;line-height:15px}
 .bar.Industrialisation{background:#b45309}.leg.indus{background:#b45309}
 .bar.task-production{background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.28) 0 5px,transparent 5px 10px)!important}.leg.prod{background:repeating-linear-gradient(135deg,#8993a5 0 2px,#d5dae3 2px 4px)}.type-badge.production{background:#fdecdc;color:#9a4508}.production-tag{color:#9a4508;font-weight:700}
 #rdpSaveBtn:disabled{opacity:.45;cursor:default}
@@ -635,7 +668,8 @@ body.rdp-readonly .bar,body.rdp-readonly .milestone{cursor:default}
         <button class="nav-item active" data-view="planning"><span>▤</span> Planning</button>
         <button class="nav-item" data-view="capacity"><span>◫</span> Charge équipe</button>
         <button class="nav-item" data-view="tests"><span>◉</span> Tests</button>
-        <button class="nav-item" data-view="specs"><span>✓</span> Specs</button>
+        <button class="nav-item" data-view="specs" hidden><span>✓</span> Specs</button>
+        <button class="nav-item" data-view="benches"><span>▦</span> Paillasses</button>
         <button class="nav-item" data-view="settings"><span>⚙</span> Paramètres</button>
       </nav>
       <div class="side-section">
@@ -703,6 +737,8 @@ body.rdp-readonly .bar,body.rdp-readonly .milestone{cursor:default}
           </div>
         </div>
       </section>
+
+      <section id="benchView" hidden></section>
 
       <section id="specsView" hidden>
         <div class="specs-heading">
@@ -783,7 +819,7 @@ body.rdp-readonly .bar,body.rdp-readonly .milestone{cursor:default}
       <fieldset class="allocation-box decision-optional"><legend>Allocation par personne</legend><div id="allocationEditor"></div><small class="field-help">Pourcentage du temps de travail consacré à cette tâche pendant sa réalisation.</small></fieldset>
       <label class="decision-optional">Compétences requises<select id="taskSkills" multiple size="5"></select><small class="field-help">Sélectionnez une ou plusieurs compétences. La liste se gère dans Paramètres.</small></label>
       <label class="decision-optional">Groupe / lot de travail<input id="taskGroup" list="groupList" placeholder="Ex. Carte de puissance, Validation, Supply"><datalist id="groupList"></datalist></label>
-      <label class="decision-optional">Dépend de<select id="taskDependency" multiple size="6"><option value="">Aucune dépendance</option></select><small class="field-help">Ctrl ou ⌘ pour en choisir plusieurs : la tâche démarre après la fin de la dernière.</small></label><label class="decision-optional">Items concernés<select id="taskItems" multiple size="4"></select><small class="field-help">Ctrl ou ⌘ pour en choisir plusieurs.</small></label>
+      <label class="decision-optional">Dépend de<select id="taskDependency" multiple size="6"><option value="">Aucune dépendance</option></select><small class="field-help">Ctrl ou ⌘ pour en choisir plusieurs : la tâche démarre après la fin de la dernière.</small></label><label class="decision-optional">Paillasses / moyens de test<select id="taskBenches" multiple size="4"></select><small class="field-help">Occupées pendant toute la durée de la tâche (agenda des paillasses). Ctrl ou ⌘ pour plusieurs.</small></label><label class="decision-optional">Items concernés<select id="taskItems" multiple size="4"></select><small class="field-help">Ctrl ou ⌘ pour en choisir plusieurs.</small></label>
       <label id="triggerField">Supply déclenchée<select id="taskTrigger"><option value="">Aucun bloc supply</option></select></label>
       <fieldset class="decision-checklist" id="decisionChecklist" hidden>
         <legend>Checklist de validation du jalon</legend>
@@ -2813,6 +2849,7 @@ $('#exportDataBtn').onclick = async () => {
       }
       var extra = allDeps(t).slice(1).map(function (id) { var p = tasks.find(function (x) { return x.id == id; }); return p ? p.name : ''; }).filter(Boolean);
       if (extra.length && !meta.querySelector('.rdp-more-deps')) meta.insertAdjacentHTML('beforeend', '<span class="dependency-chip rdp-more-deps" title="Aussi après : ' + esc(extra.join(' ; ')) + '">+' + extra.length + ' dépendance' + (extra.length > 1 ? 's' : '') + '</span>');
+      (t.benches || []).forEach(function (id) { var n = benchName(id); if (n) meta.insertAdjacentHTML('beforeend', '<span class="rdp-bench-chip">▦ ' + esc(n) + '</span>'); });
       (t.items || []).forEach(function (it) { meta.insertAdjacentHTML('beforeend', '<span class="rdp-item" style="--c:' + itemColor(it) + '">' + esc(it) + '</span>'); });
       if (!meta.querySelector('.rdp-dates')) meta.insertAdjacentHTML('afterbegin', '<span class="rdp-dates">' + (t.milestone ? 'le ' + shortDate(t.start) : shortDate(t.start) + ' → ' + shortDate(t.end)) + '</span>');
     });
@@ -2879,6 +2916,12 @@ $('#exportDataBtn').onclick = async () => {
         var ids = t ? allDeps(t).map(String) : [];
         var dsel = q('#taskDependency');
         if (dsel) Array.prototype.forEach.call(dsel.options, function (o) { o.selected = o.value ? ids.indexOf(o.value) >= 0 : !ids.length; });
+        var bsel = q('#taskBenches');
+        if (bsel) {
+          var mineB = t && Array.isArray(t.benches) ? t.benches : [];
+          bsel.innerHTML = benches().map(function (b) { return '<option value="' + esc(b.id) + '"' + (mineB.indexOf(b.id) >= 0 ? ' selected' : '') + '>' + esc(b.name) + '</option>'; }).join('');
+          var lab = bsel.closest('label'); if (lab) lab.hidden = !benches().length;
+        }
         var isel = q('#taskItems');
         if (isel) {
           var mine = t ? (t.items || []) : (viewPrefs().item !== 'all' && viewPrefs().item !== 'none' ? [viewPrefs().item] : []);
@@ -2895,6 +2938,8 @@ $('#exportDataBtn').onclick = async () => {
       var dsel = q('#taskDependency'), isel = q('#taskItems');
       var ids = dsel ? Array.prototype.filter.call(dsel.options, function (o) { return o.selected && o.value; }).map(function (o) { return Number(o.value); }) : [];
       var items = isel ? Array.prototype.filter.call(isel.options, function (o) { return o.selected; }).map(function (o) { return o.value; }) : [];
+      var bsel = q('#taskBenches');
+      var bset = bsel ? Array.prototype.filter.call(bsel.options, function (o) { return o.selected; }).map(function (o) { return o.value; }) : null;
       var editedId = +q('#taskId').value, editedName = q('#taskName').value;
       setTimeout(function () {
         var t = tasks.find(function (x) { return x.id === editedId; }) || tasks.slice().reverse().find(function (x) { return x.name === editedName; });
@@ -2903,10 +2948,156 @@ $('#exportDataBtn').onclick = async () => {
         if (t.keyStep) { t.dep = ''; t.extraDeps = []; }
         else { t.dep = ids.length ? ids[0] : ''; t.extraDeps = ids.slice(1); }
         t.items = items;
+        if (bset) t.benches = bset;
         persist();
         render();
       }, 30);
     }, true);
+  }
+
+
+  /* =====================================================================
+     Agenda des paillasses et moyens de test (semaine par semaine)
+     Données : config.benches [{id, name, kind}] et config.benchBookings
+     [{id, benchId, start (lundi), weeks, label, who}] ; tâches : task.benches [ids].
+     ===================================================================== */
+  var BENCH_KINDS = ['Paillasse', 'Banc de test', 'Équipement'];
+  function benches() { try { return Array.isArray(config.benches) ? config.benches : []; } catch (e) { return []; } }
+  function bookings() { try { return Array.isArray(config.benchBookings) ? config.benchBookings : []; } catch (e) { return []; } }
+  function mondayOf(d) { var x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); var k = (x.getDay() + 6) % 7; x.setDate(x.getDate() - k); return x; }
+  function addDays(d, n) { var x = new Date(d); x.setDate(x.getDate() + n); return x; }
+  function benchName(id) { var b = benches().find(function (x) { return x.id === id; }); return b ? b.name : ''; }
+  function personName(id) { var p = team.find(function (x) { return x.id === id; }); return p ? p.name.trim() : ''; }
+  function usagesFor(benchId, monday) {
+    var ws = isoOf(monday), we = isoOf(addDays(monday, 6)), out = [];
+    tasks.forEach(function (t) {
+      if (Array.isArray(t.benches) && t.benches.indexOf(benchId) >= 0 && t.start <= we && t.end >= ws) out.push({ kind: 'task', task: t, label: t.name });
+    });
+    bookings().forEach(function (bk) {
+      if (bk.benchId !== benchId) return;
+      var s0 = parse(bk.start), s1 = addDays(s0, 7 * Math.max(1, Number(bk.weeks) || 1) - 1);
+      if (isoOf(s0) <= we && isoOf(s1) >= ws) out.push({ kind: 'booking', booking: bk, label: bk.label || 'Réservation' });
+    });
+    return out;
+  }
+  function saveConfig() { persist(); }
+
+  function renderBenches() {
+    var view = q('#benchView');
+    if (!view) return;
+    var list = benches(), edit = st.canWrite;
+    var first = addDays(mondayOf(new Date()), -14), end = parse(typeof PLANNING_END !== 'undefined' ? PLANNING_END : '2027-06-30');
+    var weeks = []; for (var d = new Date(first); d <= end; d = addDays(d, 7)) weeks.push(new Date(d));
+    var thisMonday = isoOf(mondayOf(new Date()));
+    var html = '<div class="rdp-bench-top"><div>' +
+      '<p class="settings-note" style="margin:0">Une case par semaine. Occupée = une tâche du Gantt utilise la paillasse, ou une réservation manuelle. Cliquez sur une case pour voir le détail' + (edit ? ' ou réserver' : '') + '.</p></div>' +
+      '<div class="rdp-bench-legend"><span><i class="rdp-c-free"></i>Libre</span><span><i class="rdp-c-task"></i>Tâche du Gantt</span><span><i class="rdp-c-book"></i>Réservation</span><span><i class="rdp-c-conflict"></i>Conflit</span></div></div>';
+    if (!list.length) {
+      html += '<div class="panel rdp-bench-empty">Aucune paillasse ni moyen de test pour l’instant.' + (edit ? ' Ajoutez-les ci-dessous.' : ' Un éditeur doit les ajouter.') + '</div>';
+    } else {
+      html += '<div class="rdp-bench-wrap"><table class="rdp-bench-table"><thead><tr><th class="rdp-bench-name rdp-bench-corner" rowspan="2">Paillasse / moyen</th>';
+      var months = [], cur = null;
+      weeks.forEach(function (w) { var k = w.getFullYear() + '-' + w.getMonth(); if (!cur || cur.k !== k) { cur = { k: k, label: MONTHS[w.getMonth()] + ' ' + w.getFullYear(), n: 0 }; months.push(cur); } cur.n++; });
+      months.forEach(function (m) { html += '<th class="rdp-bench-month" colspan="' + m.n + '">' + m.label + '</th>'; });
+      html += '</tr><tr>';
+      weeks.forEach(function (w) { var iso = isoOf(w); html += '<th class="rdp-bench-week' + (iso === thisMonday ? ' rdp-now' : '') + '"><b>S' + weekNo(w) + '</b><span>' + w.getDate() + '/' + (w.getMonth() + 1) + '</span></th>'; });
+      html += '</tr></thead><tbody>';
+      list.forEach(function (b) {
+        html += '<tr><th class="rdp-bench-name"><strong>' + esc(b.name) + '</strong><small>' + esc(b.kind || '') + '</small></th>';
+        weeks.forEach(function (w) {
+          var u = usagesFor(b.id, w), iso = isoOf(w);
+          var cls = !u.length ? 'rdp-c-free' : u.length > 1 ? 'rdp-c-conflict' : u[0].kind === 'task' ? 'rdp-c-task' : 'rdp-c-book';
+          var title = u.length ? u.map(function (x) { return x.label; }).join(' ; ') : 'Libre';
+          var txt = u.length ? esc(u[0].label.length > 14 ? u[0].label.slice(0, 13) + '…' : u[0].label) + (u.length > 1 ? ' <b>+' + (u.length - 1) + '</b>' : '') : '';
+          html += '<td class="rdp-bench-cell ' + cls + (iso === thisMonday ? ' rdp-now' : '') + '" data-bench="' + esc(b.id) + '" data-week="' + iso + '" title="' + esc(title) + '">' + txt + '</td>';
+        });
+        html += '</tr>';
+      });
+      html += '</tbody></table></div>';
+    }
+    if (edit) {
+      html += '<div class="panel rdp-bench-admin"><div class="panel-title"><div><p class="eyebrow">LISTE</p><h2>Paillasses et moyens de test</h2></div><button class="btn primary" type="button" id="rdpBenchAdd">＋ Ajouter</button></div><div id="rdpBenchRows">' +
+        list.map(function (b) {
+          return '<div class="rdp-bench-row" data-id="' + esc(b.id) + '"><input class="rdp-b-name" value="' + esc(b.name) + '" aria-label="Nom"><select class="rdp-b-kind" aria-label="Type">' +
+            BENCH_KINDS.map(function (k) { return '<option' + (k === b.kind ? ' selected' : '') + '>' + k + '</option>'; }).join('') +
+            '</select><button class="icon-btn rdp-b-del" type="button" aria-label="Supprimer">×</button></div>';
+        }).join('') + '</div><p class="settings-note">Pour qu’une tâche occupe une paillasse, ouvrez la tâche dans le Planning et choisissez-la dans « Paillasses / moyens de test ».</p></div>';
+    }
+    view.innerHTML = html;
+    view.querySelectorAll('.rdp-bench-cell').forEach(function (td) { td.onclick = function () { openBenchCell(td.dataset.bench, td.dataset.week); }; });
+    if (!edit) return;
+    q('#rdpBenchAdd').onclick = function () {
+      if (!Array.isArray(config.benches)) config.benches = [];
+      config.benches.push({ id: 'b' + Date.now(), name: 'Nouvelle paillasse', kind: 'Paillasse' });
+      saveConfig(); renderBenches();
+      var inputs = view.querySelectorAll('.rdp-b-name'); if (inputs.length) { inputs[inputs.length - 1].focus(); inputs[inputs.length - 1].select(); }
+    };
+    view.querySelectorAll('.rdp-bench-row').forEach(function (row) {
+      var b = config.benches.find(function (x) { return x.id === row.dataset.id; });
+      row.querySelector('.rdp-b-name').onchange = function (e) { b.name = e.target.value.trim() || b.name; saveConfig(); renderBenches(); };
+      row.querySelector('.rdp-b-kind').onchange = function (e) { b.kind = e.target.value; saveConfig(); renderBenches(); };
+      row.querySelector('.rdp-b-del').onclick = async function () {
+        var used = tasks.filter(function (t) { return (t.benches || []).indexOf(b.id) >= 0; }).length + bookings().filter(function (x) { return x.benchId === b.id; }).length;
+        var v = await modal({ eyebrow: 'PAILLASSES', title: 'Supprimer « ' + b.name + ' » ?', html: used ? 'Elle est utilisée par ' + used + ' tâche(s) ou réservation(s), qui seront détachées.' : 'Elle n’est utilisée nulle part.', buttons: [{ label: 'Annuler', value: 'no', kind: 'ghost' }, { label: 'Supprimer', value: 'yes', kind: 'danger' }], cancelValue: 'no' });
+        if (v !== 'yes') return;
+        config.benches = config.benches.filter(function (x) { return x.id !== b.id; });
+        config.benchBookings = bookings().filter(function (x) { return x.benchId !== b.id; });
+        tasks.forEach(function (t) { if (Array.isArray(t.benches)) t.benches = t.benches.filter(function (id) { return id !== b.id; }); });
+        saveConfig(); renderBenches();
+      };
+    });
+  }
+
+  function openBenchCell(benchId, weekIso) {
+    var monday = parse(weekIso), u = usagesFor(benchId, monday), edit = st.canWrite;
+    var dlg = q('#rdpBenchDlg');
+    if (!dlg) { dlg = document.createElement('dialog'); dlg.id = 'rdpBenchDlg'; document.body.appendChild(dlg); }
+    var html = '<form method="dialog" style="padding:23px"><div class="dialog-head"><div><p class="eyebrow">' + esc(benchName(benchId)).toUpperCase() + '</p><h2>Semaine ' + weekNo(monday) + ' · du ' + shortDate(weekIso) + ' au ' + shortDate(isoOf(addDays(monday, 6))) + '</h2></div><button class="icon-btn" type="button" value="close" data-x>×</button></div>';
+    html += u.length ? '<div class="rdp-usages">' + u.map(function (x) {
+      if (x.kind === 'task') return '<div class="rdp-usage rdp-c-task"><strong>' + esc(x.task.name) + '</strong><span>Tâche du Gantt · ' + shortDate(x.task.start) + ' → ' + shortDate(x.task.end) + '</span><button class="btn ghost" type="button" data-open="' + x.task.id + '">Ouvrir la tâche</button></div>';
+      var bk = x.booking;
+      return '<div class="rdp-usage rdp-c-book"><strong>' + esc(bk.label || 'Réservation') + '</strong><span>Réservation · ' + (personName(bk.who) ? esc(personName(bk.who)) + ' · ' : '') + shortDate(bk.start) + ' · ' + bk.weeks + ' semaine' + (bk.weeks > 1 ? 's' : '') + '</span>' + (edit ? '<button class="btn danger" type="button" data-del="' + esc(bk.id) + '">Supprimer</button>' : '') + '</div>';
+    }).join('') + '</div>' + (u.length > 1 ? '<p class="rdp-conflict-note">⚠ Plusieurs usages cette semaine : à arbitrer.</p>' : '') : '<p class="settings-note" style="margin:0 0 14px">Libre cette semaine.</p>';
+    if (edit) {
+      html += '<fieldset class="rdp-book-form"><legend>Nouvelle réservation à partir de cette semaine</legend>' +
+        '<label>Motif<input id="rdpBkLabel" placeholder="Ex. Essais surge, maintenance, démo client"></label>' +
+        '<div class="form-grid"><label>Pour<select id="rdpBkWho"><option value="">—</option>' + team.map(function (p) { return '<option value="' + esc(p.id) + '">' + esc(p.name.trim()) + '</option>'; }).join('') + '</select></label>' +
+        '<label>Nombre de semaines<input id="rdpBkWeeks" type="number" min="1" max="52" value="1"></label></div>' +
+        '<button class="btn primary" type="button" id="rdpBkAdd">Réserver</button></fieldset>';
+    }
+    html += '</form>';
+    dlg.innerHTML = html;
+    dlg.querySelector('[data-x]').onclick = function () { dlg.close(); };
+    dlg.querySelectorAll('[data-open]').forEach(function (b) { b.onclick = function () { dlg.close(); var id = Number(b.dataset.open); var nav = q('.nav-item[data-view=planning]'); if (nav) nav.click(); openTask(id); }; });
+    dlg.querySelectorAll('[data-del]').forEach(function (b) { b.onclick = function () { config.benchBookings = bookings().filter(function (x) { return x.id !== b.dataset.del; }); saveConfig(); renderBenches(); dlg.close(); notify('Réservation supprimée'); }; });
+    var add = dlg.querySelector('#rdpBkAdd');
+    if (add) add.onclick = function () {
+      var label = dlg.querySelector('#rdpBkLabel').value.trim();
+      if (!label) { dlg.querySelector('#rdpBkLabel').focus(); return; }
+      if (!Array.isArray(config.benchBookings)) config.benchBookings = [];
+      config.benchBookings.push({ id: 'r' + Date.now(), benchId: benchId, start: weekIso, weeks: Math.max(1, Math.min(52, Number(dlg.querySelector('#rdpBkWeeks').value) || 1)), label: label, who: dlg.querySelector('#rdpBkWho').value });
+      saveConfig(); renderBenches(); dlg.close(); notify('Paillasse réservée');
+    };
+    dlg.showModal();
+  }
+  window.rdpRenderBenches = renderBenches;
+
+  function setupBenches() {
+    var navBtn = q('.nav-item[data-view=benches]'), view = q('#benchView');
+    if (!navBtn || !view) return;
+    var specsBtn = q('.nav-item[data-view=specs]'); if (specsBtn) specsBtn.hidden = true;
+    document.querySelectorAll('.nav-item').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var on = b.dataset.view === 'benches';
+        view.hidden = !on;
+        if (on) {
+          ['planning', 'capacity', 'tests', 'specs', 'settings'].forEach(function (v) { var sct = q('#' + v + 'View'); if (sct) sct.hidden = true; });
+          document.querySelectorAll('.nav-item').forEach(function (x) { x.classList.toggle('active', x === b); });
+          q('#viewTitle').textContent = 'Agenda des paillasses';
+          renderBenches();
+        }
+      });
+    });
   }
 
   function setupPlanningExtras() {
@@ -2921,6 +3112,7 @@ $('#exportDataBtn').onclick = async () => {
     }
     setupToolbar();
     setupDialog();
+    setupBenches();
     try { render(); } catch (e) {}
     try { if (typeof renderSpecs === 'function') renderSpecs(); } catch (e) {}
     var rt = null;
@@ -3037,6 +3229,7 @@ $('#exportDataBtn').onclick = async () => {
       try { specStatuses = data.specStatuses && typeof data.specStatuses === 'object' ? data.specStatuses : {}; } catch (e) {}
       render();
       if (typeof renderSpecs === 'function') renderSpecs();
+      if (q('#benchView') && !q('#benchView').hidden) renderBenches();
     } finally { S.applying = false; }
     st.base = data;
     st.eTag = meta.eTag;
