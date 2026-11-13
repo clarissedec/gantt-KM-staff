@@ -32,6 +32,9 @@ const RDP_CONFIG = {
   // Dernière date affichée sur le Gantt (format AAAA-MM-JJ).
   PLANNING_END: '2027-06-30',
 
+  // Une tâche qui attend au moins ce nombre de tâches est signalée en rouge sur le Gantt.
+  MULTI_DEP_ALERT: 2,
+
   // Vérification des modifications faites par les autres (en secondes).
   REFRESH_SECONDS: 60,
 
@@ -581,6 +584,11 @@ const RDP_CONFIG = {
 .rdp-toggle:first-of-type{margin-left:auto!important}
 .toolbar{flex-wrap:wrap}
 .toolbar .search{min-width:190px}
+.bar.rdp-multidep{outline:2px dashed #dc2626;outline-offset:2px}
+.milestone.rdp-multidep{outline:2px dashed #dc2626;outline-offset:3px}
+.rdp-multidep-tag{color:#b91c1c;background:#fde8e8;border-radius:6px;padding:0 6px;font-weight:800;font-size:10px;line-height:16px}
+.task-cell.rdp-multidep-cell{background:#fff7f7}
+.leg.multidep{background:transparent;outline:2px dashed #dc2626;outline-offset:1px}
 .bar.Industrialisation{background:#b45309}.leg.indus{background:#b45309}
 .bar.task-production{background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.28) 0 5px,transparent 5px 10px)!important}.leg.prod{background:repeating-linear-gradient(135deg,#8993a5 0 2px,#d5dae3 2px 4px)}.type-badge.production{background:#fdecdc;color:#9a4508}.production-tag{color:#9a4508;font-weight:700}
 #rdpSaveBtn:disabled{opacity:.45;cursor:default}
@@ -679,7 +687,7 @@ body.rdp-readonly .bar,body.rdp-readonly .milestone{cursor:default}
           </div>
           <div id="ganttBody"></div>
         </div>
-        <div class="legend"><span><i class="leg research"></i>Recherche</span><span><i class="leg prototype"></i>Prototype</span><span><i class="leg test"></i>Tests</span><span><i class="leg scale"></i>Échelle</span><span><i class="leg indus"></i>Industrialisation</span><span><i class="leg prod"></i>Production</span><span><i class="diamond"></i>Jalon TRL</span><span><i class="diamond keystep"></i>Étape clé</span></div>
+        <div class="legend"><span><i class="leg research"></i>Recherche</span><span><i class="leg prototype"></i>Prototype</span><span><i class="leg test"></i>Tests</span><span><i class="leg scale"></i>Échelle</span><span><i class="leg indus"></i>Industrialisation</span><span><i class="leg prod"></i>Production</span><span><i class="leg multidep"></i>Attend 2 tâches ou plus</span><span><i class="diamond"></i>Jalon TRL</span><span><i class="diamond keystep"></i>Étape clé</span></div>
       </section>
 
       <section id="capacityView" hidden>
@@ -2796,6 +2804,13 @@ $('#exportDataBtn').onclick = async () => {
       var meta = cell.querySelector('.task-meta');
       if (!t || !meta) return;
       if (t.type === 'production' && !meta.querySelector('.production-tag')) meta.insertAdjacentHTML('beforeend', '<span class="production-tag">Production</span>');
+      var nDeps = allDeps(t).length, alertAt = Math.max(2, Number(C.MULTI_DEP_ALERT) || 2);
+      if (nDeps >= alertAt) {
+        cell.classList.add('rdp-multidep-cell');
+        if (!meta.querySelector('.rdp-multidep-tag')) meta.insertAdjacentHTML('afterbegin', '<span class="rdp-multidep-tag" title="Cette tâche attend ' + nDeps + ' tâches : un retard sur l’une d’elles la décale">⚠ ' + nDeps + ' dépendances</span>');
+        var row = cell.closest('.gantt-row');
+        if (row) row.querySelectorAll('.bar[data-id="' + t.id + '"], .milestone[data-id="' + t.id + '"]').forEach(function (el) { el.classList.add('rdp-multidep'); });
+      }
       var extra = allDeps(t).slice(1).map(function (id) { var p = tasks.find(function (x) { return x.id == id; }); return p ? p.name : ''; }).filter(Boolean);
       if (extra.length && !meta.querySelector('.rdp-more-deps')) meta.insertAdjacentHTML('beforeend', '<span class="dependency-chip rdp-more-deps" title="Aussi après : ' + esc(extra.join(' ; ')) + '">+' + extra.length + ' dépendance' + (extra.length > 1 ? 's' : '') + '</span>');
       (t.items || []).forEach(function (it) { meta.insertAdjacentHTML('beforeend', '<span class="rdp-item" style="--c:' + itemColor(it) + '">' + esc(it) + '</span>'); });
@@ -2848,6 +2863,8 @@ $('#exportDataBtn').onclick = async () => {
     }
     var hd = q('#hideDone'); if (hd) { hd.checked = viewPrefs().hideDone; hd.onchange = function () { setView({ hideDone: hd.checked }); renderGantt(); }; }
     var bv = q('#blockView'); if (bv) { bv.checked = viewPrefs().blocks; bv.onchange = function () { setView({ blocks: bv.checked }); renderGantt(); }; }
+    var si = q('#searchInput'); if (si) si.oninput = function () { renderGantt(); };
+    var pf = q('#phaseFilter'); if (pf) pf.onchange = function () { renderGantt(); };
     var tb = q('#todayBtn'); if (tb) tb.onclick = scrollToToday;
     document.querySelectorAll('.zoom').forEach(function (z) { z.addEventListener('click', function () { setTimeout(scrollToToday, 50); }); });
   }
