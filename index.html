@@ -622,6 +622,30 @@ thead .rdp-bench-name,.rdp-bench-corner{background:#f9fafc;z-index:4;top:0;posit
 .rdp-book-form{border:1px solid var(--line);border-radius:10px;padding:12px 14px}
 .rdp-book-form legend{font-size:12px;font-weight:750;padding:0 6px}
 .rdp-bench-chip{color:#475569;border:1px dashed #94a3b8;border-radius:6px;padding:0 5px;font-weight:700;font-size:10px;line-height:15px}
+.bar.rdp-has-steps>em{display:none}
+.rdp-steps{position:absolute;inset:0;display:block;pointer-events:none}
+.rdp-step{position:absolute;top:0;bottom:0;border-left:2px solid rgba(255,255,255,.85);padding:4px 5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:9.5px;font-weight:700;pointer-events:auto}
+.rdp-step:first-child{border-left:0}
+.milestone.rdp-anchored{z-index:4;top:26px;margin-left:-9px;cursor:pointer}
+.rdp-anchor-label{position:absolute;top:3px;transform:translateX(-50%);font-size:9.5px;font-weight:800;color:#8a5a06;background:#fff6e0;border:1px solid #f3d38a;border-radius:5px;padding:0 5px;white-space:nowrap;cursor:pointer;z-index:4;line-height:15px}
+.rdp-step-chip{color:#3d4658;background:#eef1f6;border-radius:6px;padding:0 6px;font-weight:700;font-size:10px;line-height:16px}
+.rdp-jalon-chip{background:#fff6e0;color:#8a5a06}
+#rdpStepsBox{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:0}
+#rdpStepsBox legend{font-size:12px;font-weight:750;padding:0 6px}
+.rdp-step-row{display:grid;grid-template-columns:1fr 70px 14px 30px;gap:6px;align-items:center;margin-bottom:6px}
+.rdp-step-row input{border:1px solid var(--line);border-radius:7px;padding:7px}
+#rdpStepsTotal{display:block;font-weight:700;color:#2b3446;margin-top:4px}
+select.rdp-dep-native{display:none!important}
+#rdpDepPicker{border:1px solid var(--line);border-radius:8px;padding:8px;background:#fff;font-weight:500}
+.rdp-dep-chips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:7px}
+.rdp-dep-chip{display:inline-flex;align-items:center;gap:4px;background:#e8f1ff;color:#1e3a8a;border-radius:6px;padding:2px 4px 2px 8px;font-size:11px;font-weight:700}
+.rdp-dep-chip button{border:0;background:transparent;color:#1e3a8a;font-size:14px;line-height:1;cursor:pointer;padding:0 3px}
+.rdp-dep-none{color:var(--muted);font-size:11px}
+.rdp-dep-search{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:7px;padding:7px;margin-bottom:6px}
+.rdp-dep-list{max-height:150px;overflow:auto;display:grid;gap:2px}
+.rdp-dep-opt{display:flex!important;flex-direction:row!important;align-items:center;gap:7px;font-size:12px;font-weight:500!important;padding:3px 4px;border-radius:5px;cursor:pointer;margin:0!important}
+.rdp-dep-opt:hover{background:#f3f5f8}
+.rdp-dep-opt input{width:auto!important;margin:0}
 .bar.Industrialisation{background:#b45309}.leg.indus{background:#b45309}
 .bar.task-production{background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.28) 0 5px,transparent 5px 10px)!important}.leg.prod{background:repeating-linear-gradient(135deg,#8993a5 0 2px,#d5dae3 2px 4px)}.type-badge.production{background:#fdecdc;color:#9a4508}.production-tag{color:#9a4508;font-weight:700}
 #rdpSaveBtn:disabled{opacity:.45;cursor:default}
@@ -819,7 +843,7 @@ body.rdp-readonly .bar,body.rdp-readonly .milestone{cursor:default}
       <fieldset class="allocation-box decision-optional"><legend>Allocation par personne</legend><div id="allocationEditor"></div><small class="field-help">Pourcentage du temps de travail consacré à cette tâche pendant sa réalisation.</small></fieldset>
       <label class="decision-optional">Compétences requises<select id="taskSkills" multiple size="5"></select><small class="field-help">Sélectionnez une ou plusieurs compétences. La liste se gère dans Paramètres.</small></label>
       <label class="decision-optional">Groupe / lot de travail<input id="taskGroup" list="groupList" placeholder="Ex. Carte de puissance, Validation, Supply"><datalist id="groupList"></datalist></label>
-      <label class="decision-optional">Dépend de<select id="taskDependency" multiple size="6"><option value="">Aucune dépendance</option></select><small class="field-help">Ctrl ou ⌘ pour en choisir plusieurs : la tâche démarre après la fin de la dernière.</small></label><label class="decision-optional">Paillasses / moyens de test<select id="taskBenches" multiple size="4"></select><small class="field-help">Occupées pendant toute la durée de la tâche (agenda des paillasses). Ctrl ou ⌘ pour plusieurs.</small></label><label class="decision-optional">Items concernés<select id="taskItems" multiple size="4"></select><small class="field-help">Ctrl ou ⌘ pour en choisir plusieurs.</small></label>
+      <fieldset id="rdpStepsBox" class="decision-optional"><legend>Étapes sur la même ligne (facultatif)</legend><div id="rdpStepRows"></div><button class="btn ghost" type="button" id="rdpStepAdd">+ Ajouter une étape</button><small class="field-help" id="rdpStepsTotal"></small><small class="field-help">Les étapes s’enchaînent dans l’ordre. Un jalon peut ensuite être placé à la fin d’une étape.</small></fieldset><label class="decision-optional">Dépend de<select id="taskDependency" multiple size="6"><option value="">Aucune dépendance</option></select><small class="field-help">Ctrl ou ⌘ pour en choisir plusieurs : la tâche démarre après la fin de la dernière.</small></label><label class="decision-optional">Paillasses / moyens de test<select id="taskBenches" multiple size="4"></select><small class="field-help">Occupées pendant toute la durée de la tâche (agenda des paillasses). Ctrl ou ⌘ pour plusieurs.</small></label><label class="decision-optional">Items concernés<select id="taskItems" multiple size="4"></select><small class="field-help">Ctrl ou ⌘ pour en choisir plusieurs.</small></label>
       <label id="triggerField">Supply déclenchée<select id="taskTrigger"><option value="">Aucun bloc supply</option></select></label>
       <fieldset class="decision-checklist" id="decisionChecklist" hidden>
         <legend>Checklist de validation du jalon</legend>
@@ -828,6 +852,7 @@ body.rdp-readonly .bar,body.rdp-readonly .milestone{cursor:default}
         <small class="field-help">Le jalon est validé lorsque toutes les lignes renseignées sont cochées.</small>
       </fieldset>
       <label class="check-row"><input id="taskMilestone" type="checkbox"> Jalon TRL</label>
+      <label id="rdpAnchorField" hidden>Placer ce jalon dans une tâche<select id="rdpAnchor"></select><small class="field-help">Le losange s’affiche sur la ligne de cette tâche et suit ses dates. Les tâches des autres équipes peuvent en dépendre.</small></label>
       <label class="check-row" id="inlineField" hidden><input id="taskInline" type="checkbox"> Afficher le losange sur la ligne de la tâche qui en dépend</label>
       <label class="check-row" id="keyStepField" hidden><input id="taskKeyStep" type="checkbox"> Étape clé (tout doit être prêt, pas une décision)</label>
       <label id="hostField" hidden>Afficher sur la ligne de<select id="taskHost"><option value="">Sur sa propre ligne</option></select><small class="field-help">Le losange se place juste avant le début de cette tâche et la suit si elle bouge. Aucun lien avec la supply ni avec les dépendances.</small></label>
@@ -2721,7 +2746,17 @@ $('#exportDataBtn').onclick = async () => {
       do {
         changed = false; pass += 1;
         tasks.forEach(function (task) {
+          var stot = stepsTotal(task);
+          if (stot) task.durationDays = stot;
           task.durationDays = Math.max(1, Number(task.durationDays) || 1);
+          if (task.anchor) {
+            var ad = anchorDate(task);
+            if (ad) { if (task.start !== ad || task.end !== ad) { task.start = ad; task.end = ad; changed = true; } return; }
+          }
+          if (stot && !task.milestone) {
+            var fe = datePlusDays(task.start, stot - 1);
+            if (task.end !== fe) { task.end = fe; changed = true; }
+          }
           if (!Array.isArray(task.extraDeps)) task.extraDeps = [];
           task.extraDeps = task.extraDeps.filter(function (id) { return id != task.id && exists(id); });
           var preds = allDeps(task).map(function (id) { return tasks.find(function (x) { return x.id == id; }); }).filter(Boolean);
@@ -2877,9 +2912,168 @@ $('#exportDataBtn').onclick = async () => {
     });
   }
 
+
+  /* =====================================================================
+     Étapes dans une tâche + jalons placés à la fin d'une étape
+     task.steps = [{id, name, days}] (la durée de la tâche = somme des étapes)
+     jalon.anchor = {task: id, step: id | 'end'} (date calculée, suit la tâche)
+     ===================================================================== */
+  function stepsOf(t) { return t && Array.isArray(t.steps) ? t.steps.filter(function (x) { return x && Number(x.days) > 0; }) : []; }
+  function stepsTotal(t) { return stepsOf(t).reduce(function (a, x) { return a + Number(x.days); }, 0); }
+  function anchorDate(m) {
+    var a = m.anchor; if (!a) return '';
+    var host = tasks.find(function (x) { return x.id == a.task; });
+    if (!host || host.id == m.id) return '';
+    if (a.step === 'end') return host.end;
+    var cum = 0, list = stepsOf(host);
+    for (var i = 0; i < list.length; i++) { cum += Number(list[i].days); if (list[i].id === a.step) return datePlusDays(host.start, cum - 1); }
+    return '';
+  }
+  function anchorLabel(m) {
+    var a = m.anchor, host = a && tasks.find(function (x) { return x.id == a.task; });
+    if (!host) return '';
+    if (a.step === 'end') return 'fin de « ' + host.name + ' »';
+    var st0 = stepsOf(host).find(function (x) { return x.id === a.step; });
+    return 'fin de l’étape « ' + (st0 ? st0.name : '?') + ' » de « ' + host.name + ' »';
+  }
+  var STEP_SHADES = ['rgba(255,255,255,0)', 'rgba(255,255,255,.18)'];
+  function drawSteps() {
+    document.querySelectorAll('#ganttBody .bar[data-id]').forEach(function (bar) {
+      var t = tasks.find(function (x) { return x.id == bar.dataset.id; });
+      var list = stepsOf(t), tot = stepsTotal(t);
+      if (!list.length || bar.querySelector('.rdp-steps')) return;
+      var cum = 0, html = '<span class="rdp-steps">';
+      list.forEach(function (x, i) {
+        var l = cum / tot * 100, w = Number(x.days) / tot * 100; cum += Number(x.days);
+        var s0 = datePlusDays(t.start, cum - Number(x.days)), s1 = datePlusDays(t.start, cum - 1);
+        html += '<span class="rdp-step" style="left:' + l + '%;width:' + w + '%;background:' + STEP_SHADES[i % 2] + '" title="' + esc(x.name) + ' · ' + shortDate(s0) + ' → ' + shortDate(s1) + ' (' + x.days + ' j)">' + esc(x.name) + '</span>';
+      });
+      bar.insertAdjacentHTML('beforeend', html + '</span>');
+      bar.classList.add('rdp-has-steps');
+    });
+  }
+  function moveAnchored() {
+    var hidden = 0;
+    tasks.filter(function (m) { return m.anchor && m.milestone; }).forEach(function (m) {
+      var hostBar = q('#ganttBody .bar[data-id="' + m.anchor.task + '"]');
+      var host = tasks.find(function (x) { return x.id == m.anchor.task; });
+      var hostTl = hostBar && hostBar.closest('.timeline-row');
+      if (!hostTl || !host) return;
+      var frac = 1;
+      if (m.anchor.step !== 'end') {
+        var cum = 0, tot = stepsTotal(host);
+        stepsOf(host).some(function (x) { cum += Number(x.days); return x.id === m.anchor.step; });
+        if (tot) frac = cum / tot;
+      }
+      var l = parseFloat(hostBar.style.left) || 0, w = parseFloat(hostBar.style.width) || 0, left = (l + w * frac) + '%';
+      var ownCell = q('#ganttBody .task-cell[data-id="' + m.id + '"]');
+      if (ownCell) { ownCell.closest('.gantt-row').remove(); hidden++; }
+      hostTl.insertAdjacentHTML('beforeend', '<i class="milestone decision inline-milestone rdp-anchored' + (m.keyStep ? ' keystep' : '') + '" data-anchor="' + m.id + '" style="left:' + left + '" title="' + esc(m.name + ' · le ' + longDate(m.start) + ' · ' + anchorLabel(m)) + '"></i>' +
+        '<span class="rdp-anchor-label" style="left:' + left + '" data-anchor="' + m.id + '">' + esc(m.name) + '</span>');
+    });
+    document.querySelectorAll('#ganttBody [data-anchor]').forEach(function (el) { el.onclick = function (e) { e.stopPropagation(); openTask(Number(el.dataset.anchor)); }; });
+    var count = q('#taskCount');
+    if (hidden && count) count.textContent = count.textContent.replace(/\d+/, function (n) { return String(Math.max(0, +n - hidden)); });
+  }
+  function stepChips() {
+    document.querySelectorAll('#ganttBody .task-cell[data-id]').forEach(function (cell) {
+      var t = tasks.find(function (x) { return x.id == cell.dataset.id; }), meta = cell.querySelector('.task-meta');
+      if (!t || !meta) return;
+      var n = stepsOf(t).length, j = tasks.filter(function (m) { return m.anchor && m.anchor.task == t.id; });
+      if (n) meta.insertAdjacentHTML('beforeend', '<span class="rdp-step-chip" title="' + esc(stepsOf(t).map(function (x) { return x.name + ' (' + x.days + ' j)'; }).join(' → ')) + '">' + n + ' étape' + (n > 1 ? 's' : '') + '</span>');
+      if (j.length) meta.insertAdjacentHTML('beforeend', '<span class="rdp-step-chip rdp-jalon-chip" title="' + esc(j.map(function (m) { return m.name + ' le ' + shortDate(m.start); }).join(' ; ')) + '">◆ ' + j.length + ' jalon' + (j.length > 1 ? 's' : '') + '</span>');
+      if (t.anchor) meta.insertAdjacentHTML('beforeend', '<span class="rdp-step-chip">◆ ' + esc(anchorLabel(t)) + '</span>');
+    });
+  }
+
+  // Éditeur d'étapes et choix d'ancrage dans la fiche de tâche.
+  function setupSteps() {
+    var box = q('#rdpStepsBox'), rows = q('#rdpStepRows'), addBtn = q('#rdpStepAdd'), dur = q('#taskDuration');
+    var anchorField = q('#rdpAnchorField'), anchorSel = q('#rdpAnchor');
+    if (!box || !rows) return;
+    var current = null;
+    function rowHtml(x) {
+      return '<div class="rdp-step-row" data-id="' + esc(x.id) + '"><input class="rdp-s-name" placeholder="Ex. Schéma, Routage, Fabrication, Tests" value="' + esc(x.name || '') + '"><input class="rdp-s-days" type="number" min="1" value="' + (Number(x.days) || 5) + '" aria-label="Durée en jours"><span>j</span><button class="icon-btn rdp-s-del" type="button" aria-label="Retirer">×</button></div>';
+    }
+    function read() {
+      return Array.prototype.map.call(rows.querySelectorAll('.rdp-step-row'), function (r) {
+        return { id: r.dataset.id, name: r.querySelector('.rdp-s-name').value.trim(), days: Math.max(1, Number(r.querySelector('.rdp-s-days').value) || 1) };
+      }).filter(function (x) { return x.name; });
+    }
+    function sync() {
+      var list = read(), tot = list.reduce(function (a, x) { return a + x.days; }, 0);
+      if (dur) { dur.readOnly = !!tot; if (tot) dur.value = tot; }
+      var info = q('#rdpStepsTotal'); if (info) info.textContent = tot ? 'Durée totale : ' + tot + ' j (somme des étapes)' : '';
+      var isMs = q('#taskType').value === 'decision' || (q('#taskMilestone') && q('#taskMilestone').checked);
+      if (anchorField) anchorField.hidden = !isMs;
+      var dl = q('#taskDependency') && q('#taskDependency').closest('label');
+      if (dl && isMs && !(q('#taskKeyStep') && q('#taskKeyStep').checked)) dl.hidden = !!(anchorSel && anchorSel.value);
+    }
+    function fillAnchor(sel) {
+      if (!anchorSel) return;
+      var html = '<option value="">Non, date calculée par ses dépendances</option>';
+      tasks.filter(function (t) { return !t.milestone && (!current || t.id !== current.id); }).sort(function (a, b) { return a.start < b.start ? -1 : 1; }).forEach(function (t) {
+        var list = stepsOf(t);
+        html += '<optgroup label="' + esc(t.name) + '">' + list.map(function (x) { return '<option value="' + t.id + '|' + esc(x.id) + '">Fin de l’étape « ' + esc(x.name) + ' »</option>'; }).join('') + '<option value="' + t.id + '|end">Fin de la tâche</option></optgroup>';
+      });
+      anchorSel.innerHTML = html;
+      anchorSel.value = sel || '';
+    }
+    rows.addEventListener('input', sync);
+    rows.addEventListener('click', function (e) { var b = e.target.closest('.rdp-s-del'); if (b) { b.closest('.rdp-step-row').remove(); sync(); } });
+    addBtn.onclick = function () { rows.insertAdjacentHTML('beforeend', rowHtml({ id: 's' + Date.now(), name: '', days: 5 })); rows.lastElementChild.querySelector('.rdp-s-name').focus(); sync(); };
+    if (anchorSel) anchorSel.addEventListener('change', sync);
+    q('#taskType').addEventListener('change', sync);
+    if (q('#taskMilestone')) q('#taskMilestone').addEventListener('change', sync);
+    if (q('#taskKeyStep')) q('#taskKeyStep').addEventListener('change', sync);
+
+    var baseOpen = window.openTask;
+    var open = function (id) {
+      var r = baseOpen.apply(this, arguments);
+      try {
+        current = tasks.find(function (x) { return x.id === id; }) || null;
+        rows.innerHTML = stepsOf(current).map(rowHtml).join('');
+        fillAnchor(current && current.anchor ? current.anchor.task + '|' + current.anchor.step : '');
+        if (dur) dur.readOnly = false;
+        sync();
+        if (current && current.anchor) { var hs = q('#hostField'); if (hs) hs.hidden = true; }
+      } catch (e) { console.warn(e); }
+      return r;
+    };
+    window.openTask = open;
+    try { openTask = open; } catch (e) {}
+
+    q('#taskForm').addEventListener('submit', function () {
+      var list = read(), av = anchorSel ? anchorSel.value : '';
+      var isMs = q('#taskType').value === 'decision' || (q('#taskMilestone') && q('#taskMilestone').checked);
+      var editedId = +q('#taskId').value, editedName = q('#taskName').value;
+      setTimeout(function () {
+        var t = tasks.find(function (x) { return x.id === editedId; }) || tasks.slice().reverse().find(function (x) { return x.name === editedName; });
+        if (!t) return;
+        if (!t.milestone && list.length) { t.steps = list; t.durationDays = stepsTotal(t); t.end = datePlusDays(t.start, t.durationDays - 1); }
+        else delete t.steps;
+        if (isMs && av) {
+          var parts = av.split('|');
+          t.anchor = { task: Number(parts[0]), step: parts[1] };
+          t.dep = ''; t.extraDeps = []; delete t.hostId; delete t.inline;
+        } else delete t.anchor;
+        // une étape supprimée détache les jalons qui y étaient placés
+        tasks.forEach(function (m) {
+          if (m.anchor && m.anchor.task == t.id && m.anchor.step !== 'end' && !stepsOf(t).some(function (x) { return x.id === m.anchor.step; })) m.anchor.step = 'end';
+        });
+        tasks.forEach(function (m) { if (m.anchor && !exists(m.anchor.task)) delete m.anchor; });
+        cascadeDependencies();
+        persist();
+        render();
+      }, 60);
+    }, true);
+  }
+
   function postRender() {
     try { buildTimeline(); } catch (e) { console.warn(e); }
+    try { moveAnchored(); } catch (e) { console.warn(e); }
     try { decorateRows(); } catch (e) { console.warn(e); }
+    try { stepChips(); drawSteps(); } catch (e) { console.warn(e); }
   }
 
   function scrollToToday() {
@@ -2906,8 +3100,42 @@ $('#exportDataBtn').onclick = async () => {
     document.querySelectorAll('.zoom').forEach(function (z) { z.addEventListener('click', function () { setTimeout(scrollToToday, 50); }); });
   }
 
+
+  /* Sélecteur de dépendances à cases à cocher : un clic ajoute ou retire une
+     dépendance sans effacer les autres (remplace la liste à Ctrl/⌘). */
+  function setupDepPicker() {
+    var sel = q('#taskDependency');
+    if (!sel || q('#rdpDepPicker')) return;
+    sel.classList.add('rdp-dep-native');
+    sel.insertAdjacentHTML('afterend', '<div id="rdpDepPicker"><div class="rdp-dep-chips"></div><input class="rdp-dep-search" type="search" placeholder="Rechercher une tâche à ajouter…"><div class="rdp-dep-list"></div></div>');
+    var box = q('#rdpDepPicker'), chips = box.querySelector('.rdp-dep-chips'), search = box.querySelector('.rdp-dep-search'), list = box.querySelector('.rdp-dep-list');
+    var help = sel.parentNode.querySelector('.field-help');
+    if (help) help.textContent = 'Cochez une ou plusieurs tâches : celle-ci démarre après la fin de la dernière. Les dépendances déjà cochées restent en place.';
+    function chosen() { return Array.prototype.filter.call(sel.options, function (o) { return o.selected && o.value; }); }
+    function draw() {
+      var c = chosen(), term = search.value.trim().toLowerCase();
+      chips.innerHTML = c.length ? c.map(function (o) { return '<span class="rdp-dep-chip">' + esc(o.textContent) + '<button type="button" data-v="' + esc(o.value) + '" aria-label="Retirer">×</button></span>'; }).join('') : '<span class="rdp-dep-none">Aucune dépendance</span>';
+      var self = q('#taskId').value;
+      list.innerHTML = Array.prototype.filter.call(sel.options, function (o) { return o.value && o.value !== self && (!term || o.textContent.toLowerCase().indexOf(term) >= 0); })
+        .map(function (o) { return '<label class="rdp-dep-opt"><input type="checkbox" value="' + esc(o.value) + '"' + (o.selected ? ' checked' : '') + (sel.disabled ? ' disabled' : '') + '> ' + esc(o.textContent) + '</label>'; }).join('') || '<small class="field-help">Aucune tâche trouvée.</small>';
+      chips.querySelectorAll('button').forEach(function (b) { b.hidden = sel.disabled; });
+    }
+    function set(v, on) {
+      Array.prototype.forEach.call(sel.options, function (o) { if (o.value === v) o.selected = on; if (!o.value) o.selected = false; });
+      if (!chosen().length && sel.options[0] && !sel.options[0].value) sel.options[0].selected = true;
+      sel.dispatchEvent(new Event('change', { bubbles: true }));
+      draw();
+    }
+    list.addEventListener('change', function (e) { if (e.target.type === 'checkbox') set(e.target.value, e.target.checked); });
+    chips.addEventListener('click', function (e) { var b = e.target.closest('button[data-v]'); if (b && !sel.disabled) set(b.dataset.v, false); });
+    search.addEventListener('input', draw);
+    search.addEventListener('keydown', function (e) { if (e.key === 'Enter') e.preventDefault(); });
+    window.rdpDrawDeps = function () { search.value = ''; draw(); };
+  }
+
   // Fiche de tâche : plusieurs dépendances + items concernés.
   function setupDialog() {
+    setupDepPicker();
     var baseOpen = window.openTask;
     var open = function (id) {
       var r = baseOpen.apply(this, arguments);
@@ -2916,6 +3144,7 @@ $('#exportDataBtn').onclick = async () => {
         var ids = t ? allDeps(t).map(String) : [];
         var dsel = q('#taskDependency');
         if (dsel) Array.prototype.forEach.call(dsel.options, function (o) { o.selected = o.value ? ids.indexOf(o.value) >= 0 : !ids.length; });
+        if (window.rdpDrawDeps) setTimeout(window.rdpDrawDeps, 0);
         var bsel = q('#taskBenches');
         if (bsel) {
           var mineB = t && Array.isArray(t.benches) ? t.benches : [];
@@ -3113,6 +3342,7 @@ $('#exportDataBtn').onclick = async () => {
     setupToolbar();
     setupDialog();
     setupBenches();
+    setupSteps();
     try { render(); } catch (e) {}
     try { if (typeof renderSpecs === 'function') renderSpecs(); } catch (e) {}
     var rt = null;
