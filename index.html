@@ -646,6 +646,13 @@ select.rdp-dep-native{display:none!important}
 .rdp-dep-opt{display:flex!important;flex-direction:row!important;align-items:center;gap:7px;font-size:12px;font-weight:500!important;padding:3px 4px;border-radius:5px;cursor:pointer;margin:0!important}
 .rdp-dep-opt:hover{background:#f3f5f8}
 .rdp-dep-opt input{width:auto!important;margin:0}
+.rdp-history{border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin:10px 0}
+.rdp-history summary{cursor:pointer;font-size:12px;font-weight:750}
+#rdpHistoryList{max-height:260px;overflow:auto;margin-top:8px}
+.rdp-hist-entry{border-left:3px solid #c9d1dd;padding:2px 0 2px 10px;margin-bottom:10px;font-size:12px}
+.rdp-hist-head{color:#3d4658;margin-bottom:2px}
+.rdp-hist-entry ul{margin:0;padding-left:16px;color:#3d4658}
+.rdp-hist-auto{color:#6d7688;background:#eef1f6;border-radius:5px;padding:0 5px;font-size:10.5px}
 .bar.Industrialisation{background:#b45309}.leg.indus{background:#b45309}
 .bar.task-production{background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.28) 0 5px,transparent 5px 10px)!important}.leg.prod{background:repeating-linear-gradient(135deg,#8993a5 0 2px,#d5dae3 2px 4px)}.type-badge.production{background:#fdecdc;color:#9a4508}.production-tag{color:#9a4508;font-weight:700}
 #rdpSaveBtn:disabled{opacity:.45;cursor:default}
@@ -856,6 +863,7 @@ body.rdp-readonly .bar,body.rdp-readonly .milestone{cursor:default}
       <label class="check-row" id="inlineField" hidden><input id="taskInline" type="checkbox"> Afficher le losange sur la ligne de la tâche qui en dépend</label>
       <label class="check-row" id="keyStepField" hidden><input id="taskKeyStep" type="checkbox"> Étape clé (tout doit être prêt, pas une décision)</label>
       <label id="hostField" hidden>Afficher sur la ligne de<select id="taskHost"><option value="">Sur sa propre ligne</option></select><small class="field-help">Le losange se place juste avant le début de cette tâche et la suit si elle bouge. Aucun lien avec la supply ni avec les dépendances.</small></label>
+      <details class="rdp-history" id="rdpHistory" hidden><summary>Historique des modifications</summary><div id="rdpHistoryList"></div></details>
       <div class="match-box" id="matchBox"></div>
       <div class="dialog-actions"><button class="btn danger" type="button" id="deleteBtn" hidden>Supprimer</button><span></span><button class="btn ghost" type="button" data-close-dialog>Annuler</button><button class="btn primary" value="default" id="saveBtn">Enregistrer</button></div>
     </form>
@@ -869,7 +877,7 @@ const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)],par
 let team=JSON.parse(localStorage.getItem('rdpilot.team')||'null')||structuredClone(seedTeam);let tasks=(JSON.parse(localStorage.getItem('rdpilot.tasks')||'null')||structuredClone(seedTasks)).map(t=>({...t,type:t.type||(t.milestone?'decision':'activity')}));let config=JSON.parse(localStorage.getItem('rdpilot.config')||'null')||{sprintStart:'2026-09-14',sprintDays:7};let zoom='week',showBaseline=true;
 function initialsFor(n){return n.split(/\s+/).map(x=>x[0]).join('').slice(0,2).toUpperCase()||'NA'}function persist(){localStorage.setItem('rdpilot.tasks',JSON.stringify(tasks));localStorage.setItem('rdpilot.team',JSON.stringify(team));localStorage.setItem('rdpilot.config',JSON.stringify(config))}function person(id){return team.find(x=>x.id===id)||team[0]||{name:'Non affecté',initials:'—',color:'#8993a5',capacity:35,skills:[]}}function loadFor(id){return tasks.filter(t=>t.owner===id&&t.progress<100).reduce((a,t)=>a+t.hours,0)}function phaseClass(p){return p.replaceAll(' ','').replaceAll("'",'')}function bounds(){let dates=tasks.flatMap(t=>[parse(t.start),parse(t.end)]),min=new Date(Math.min(...dates)),max=new Date(Math.max(...dates));min.setDate(min.getDate()-7);max.setDate(max.getDate()+10);return{min,max,total:Math.max(1,Math.round((max-min)/DAY))}}function pct(date,b){return Math.max(0,Math.min(100,(parse(date)-b.min)/DAY/b.total*100))}function phaseColor(p){return({'Recherche':'#5277e8','Prototype':'#18b98b','Tests prototype':'#e5a43b',"Tests à l'échelle":'#8a6be8','Supply':'#27334d','Industrialisation':'#b45309'})[p]||'#8993a5'}
 function render(){renderTeam();renderKpis();renderGantt();renderCapacity();renderSettings()}function renderTeam(){$('#teamMini').innerHTML='<p class="eyebrow">ÉQUIPE · '+team.length+'</p>'+team.slice(0,4).map(p=>`<div class="mini-row"><i class="avatar" style="background:${p.color}">${p.initials}</i><span>${p.name}</span><small>${loadFor(p.id)}h</small></div>`).join('')}function renderKpis(){let late=tasks.filter(t=>parse(t.end)>parse(t.baseEnd)&&t.progress<100).length,progress=Math.round(tasks.reduce((a,t)=>a+t.progress,0)/tasks.length),overload=team.filter(p=>loadFor(p.id)>p.capacity).length,trl=tasks.filter(t=>t.milestone&&t.progress===100).length+3;$('#kpis').innerHTML=[['Avancement global',progress+'%','pondération simple'],['Décalages',late,late?'tâches vs baseline':'planning tenu'],['Charge critique',overload,overload?'membre(s) surchargé(s)':'capacité disponible'],['Niveau actuel','TRL '+trl,'objectif : TRL 5']].map((k,i)=>`<div class="kpi"><div class="kpi-label">${k[0]}</div><div class="kpi-value">${k[1]}</div><div class="kpi-note ${i===1&&late?'alert':''}">${k[2]}</div></div>`).join('')}
-function sprintLines(b){let d=parse(config.sprintStart),i=1,out='';while(d<b.min)d=new Date(d.getTime()+config.sprintDays*DAY);while(d<=b.max){out+=`<i class="sprint-line" data-sprint="${i++}" style="left:${pct(d.toISOString().slice(0,10),b)}%"></i>`;d=new Date(d.getTime()+config.sprintDays*DAY)}return out}
+function sprintLines(b){let d=parse(config.sprintStart),i=1,out='';while(d<b.min)d=new Date(d.getTime()+config.sprintDays*DAY);while(d<=b.max){out+=`<i class="sprint-line" data-sprint="${i++}" style="left:${pct(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'),b)}%"></i>`;d=new Date(d.getTime()+config.sprintDays*DAY)}return out}
 function renderGantt(){let q=$('#searchInput').value.toLowerCase(),phase=$('#phaseFilter').value,list=tasks.filter(t=>(phase==='all'||t.phase===phase)&&(!q||(t.name+' '+t.skills.join(' ')).toLowerCase().includes(q))),b=bounds(),start=new Date(b.min),cols=zoom==='week'?Math.ceil(b.total/7):Math.ceil(b.total/30);$('#timelineHead').style.gridTemplateColumns=`repeat(${cols},1fr)`;$('#timelineHead').innerHTML=Array.from({length:cols},(_,i)=>{let d=new Date(start);d.setDate(d.getDate()+i*(zoom==='week'?7:30));return `<div class="week-label">${zoom==='week'?'S'+weekNo(d)+' · ':''}${fmt(d)}</div>`}).join('');$('#taskCount').textContent='· '+list.length;$('#ganttBody').innerHTML=list.map(t=>{let p=person(t.owner),left=pct(t.start,b),width=Math.max(t.milestone?1.2:pct(t.end,b)-left+100/b.total),bl=pct(t.baseStart,b),bw=Math.max(1,pct(t.baseEnd,b)-bl+100/b.total),locked=t.type==='supply'&&t.triggeredBy&&tasks.find(x=>x.id==t.triggeredBy)?.progress<100,label=locked?'En attente GO':t.progress+'%';return `<div class="gantt-row"><div class="task-cell" data-id="${t.id}"><div><div class="task-title">${t.name}</div><div class="task-meta"><span><i class="phase-dot" style="background:${phaseColor(t.phase)}"></i> ${t.phase}</span><span>${t.hours}h/sem.</span>${t.type==='decision'?'<span class="decision-tag">Décision</span>':''}${t.type==='supply'?'<span class="supply-tag">Supply</span>':''}</div></div><div class="owner-cell"><i class="avatar" style="background:${p.color}">${p.initials}</i>${p.name}</div><div class="expand">›</div></div><div class="timeline-row">${sprintLines(b)}<i class="today-line" style="left:${pct(new Date().toLocaleDateString('sv-SE'),b)}%"></i>${showBaseline?`<i class="baseline" style="left:${bl}%;width:${bw}%"></i>`:''}${t.milestone?`<i class="milestone ${t.type==='decision'?'decision':''}" data-id="${t.id}" style="left:${left}%"></i>`:`<div class="bar ${phaseClass(t.phase)} ${locked?'supply-locked':''}" data-id="${t.id}" style="left:${left}%;width:${width}%"><i class="progress-fill" style="width:${t.progress}%"></i><em>${label}</em></div>`}</div></div>`}).join('');$$('[data-id]').forEach(el=>el.onclick=()=>openTask(+el.dataset.id))}
 function weekNo(d){let x=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));x.setUTCDate(x.getUTCDate()+4-(x.getUTCDay()||7));return Math.ceil((((x-new Date(Date.UTC(x.getUTCFullYear(),0,1)))/DAY)+1)/7)}
 function renderCapacity(){$('#capacityGrid').innerHTML=team.map(p=>{let load=loadFor(p.id),ratio=Math.round(load/p.capacity*100),cl=ratio>110?'over':ratio>90?'warn':'';return `<div class="capacity-row"><div class="person"><i class="avatar" style="background:${p.color}">${p.initials}</i><span><strong>${p.name}</strong><small>${p.role}</small></span></div><div class="load-track"><i class="load-fill ${cl}" style="width:${Math.min(100,ratio)}%"></i></div><div class="load-num">${ratio}%</div></div>`}).join('');let all=[...new Set(tasks.flatMap(t=>t.skills))];$('#skillCoverage').innerHTML=all.slice(0,8).map(s=>{let count=team.filter(p=>p.skills.some(x=>x.toLowerCase()===s.toLowerCase())).length;return `<div class="skill-item"><div class="skill-name">${s}<span class="${count<2?'risk':''}">${count} personne${count>1?'s':''}</span></div><div class="skill-bar"><i style="width:${Math.min(100,count/3*100)}%"></i></div></div>`}).join('')}
@@ -1089,7 +1097,7 @@ tasks.forEach((task, index) => {
 function datePlusDays(dateString, delta) {
   const date = parse(dateString);
   date.setDate(date.getDate() + delta);
-  return date.toISOString().slice(0, 10);
+  return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
 }
 
 const renderGanttInteractionsBase = renderGantt;
@@ -3329,13 +3337,114 @@ $('#exportDataBtn').onclick = async () => {
     });
   }
 
+
+  /* =====================================================================
+     Historique des modifications par tâche : task.history =
+     [{at, by, created?, auto?, changes:[{f, from, to}]}] (50 dernières).
+     Les changements d'un même utilisateur dans les 10 s sont regroupés.
+     ===================================================================== */
+  var HIST_LABELS = { name: 'Nom', start: 'Début', end: 'Fin', durationDays: 'Durée', progress: 'Avancement', people: 'Personnes', teamGroup: 'Équipe', phase: 'Phase', type: 'Type', deps: 'Dépend de', items: 'Items', benches: 'Paillasses', steps: 'Étapes', anchor: 'Placé dans', checklist: 'Checklist' };
+  var TYPE_LABELS = { research: 'Recherche', development: 'Développement', production: 'Production', supply: 'Bloc supply', decision: 'Jalon de décision' };
+  var histSnap = null, histReady = false;
+  function d8(s) { if (!s) return ''; var d = parse(s); return pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1) + '/' + d.getFullYear(); }
+  function taskName(id) { var t = tasks.find(function (x) { return x.id == id; }); return t ? t.name : ''; }
+  function histView(t) {
+    var people = (Array.isArray(t.assignees) && t.assignees.length ? t.assignees : [t.owner]).map(personName).filter(Boolean);
+    var cl = Array.isArray(t.decisionChecklist) ? t.decisionChecklist.filter(function (c) { return c && c.text; }) : [];
+    return {
+      name: t.name || '', start: d8(t.start), end: t.milestone ? '' : d8(t.end), durationDays: t.milestone ? '' : (t.durationDays || '') + ' j',
+      progress: (Number(t.progress) || 0) + ' %', people: people.join(', '), teamGroup: t.teamGroup || '', phase: t.phase || '',
+      type: TYPE_LABELS[t.type] || t.type || '', deps: t.anchor ? '' : allDeps(t).map(taskName).filter(Boolean).join(', '),
+      items: (t.items || []).join(', '), benches: (t.benches || []).map(benchName).filter(Boolean).join(', '),
+      steps: stepsOf(t).map(function (x) { return x.name + ' ' + x.days + ' j'; }).join(' → '),
+      anchor: t.anchor ? anchorLabel(t) : '', checklist: cl.length ? cl.filter(function (c) { return c.done; }).length + '/' + cl.length + ' validés' : ''
+    };
+  }
+  function histReset() {
+    histSnap = {};
+    tasks.forEach(function (t) { histSnap[t.id] = histView(t); });
+    histReady = true;
+  }
+  window.rdpHistReset = histReset;
+  function histRecord() {
+    if (!histReady || S.applying || !st.canWrite) { if (histReady) histReset(); return; }
+    var now = new Date(), who = userName() || 'Inconnu', next = {};
+    tasks.forEach(function (t) {
+      var v = histView(t); next[t.id] = v;
+      var old = histSnap[t.id], changes = [];
+      if (!old) { pushHist(t, { at: now.toISOString(), by: who, created: true, changes: [] }); return; }
+      Object.keys(HIST_LABELS).forEach(function (f) { if (old[f] !== v[f]) changes.push({ f: f, from: old[f], to: v[f] }); });
+      if (!changes.length) return;
+      var onlyDates = changes.every(function (c) { return c.f === 'start' || c.f === 'end'; });
+      var auto = onlyDates && (allDeps(t).length > 0 || !!t.anchor);
+      var h = Array.isArray(t.history) ? t.history : [], last = h[h.length - 1];
+      if (last && last.by === who && now - new Date(last.at) < 10000 && !!last.auto === auto) {
+        changes.forEach(function (c) {
+          var ex = (last.changes || []).find(function (x) { return x.f === c.f; });
+          if (ex) ex.to = c.to; else (last.changes = last.changes || []).push(c);
+        });
+        last.changes = last.changes.filter(function (x) { return x.from !== x.to; });
+        last.at = now.toISOString();
+        if (!last.changes.length && !last.created) h.pop();
+      } else pushHist(t, { at: now.toISOString(), by: who, auto: auto || undefined, changes: changes });
+    });
+    histSnap = next;
+  }
+  function pushHist(t, e) {
+    if (!Array.isArray(t.history)) t.history = [];
+    t.history.push(e);
+    if (t.history.length > 50) t.history = t.history.slice(-50);
+  }
+  function histHtml(t) {
+    var h = t && Array.isArray(t.history) ? t.history.slice().reverse() : [];
+    if (!h.length) return '<p class="settings-note">Aucune modification enregistrée depuis la mise en place de l’historique.</p>';
+    return h.map(function (e) {
+      var d = new Date(e.at), when = pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1) + '/' + d.getFullYear() + ' à ' + pad2(d.getHours()) + 'h' + pad2(d.getMinutes());
+      var body = e.created ? '<li>Création de la tâche</li>' : (e.changes || []).map(function (c) {
+        return '<li><b>' + esc(HIST_LABELS[c.f] || c.f) + '</b> : ' + (c.from ? esc(c.from) : '<i>vide</i>') + ' → ' + (c.to ? esc(c.to) : '<i>vide</i>') + '</li>';
+      }).join('');
+      return '<div class="rdp-hist-entry"><div class="rdp-hist-head"><strong>' + when + '</strong> · ' + esc(e.by || '') + (e.auto ? ' <span class="rdp-hist-auto">recalcul automatique (dépendance)</span>' : '') + '</div><ul>' + body + '</ul></div>';
+    }).join('');
+  }
+  function setupHistory() {
+    var basePersist = window.persist;
+    var wrapped = function () { try { histRecord(); } catch (e) { console.warn(e); } return basePersist.apply(this, arguments); };
+    window.persist = wrapped;
+    try { persist = wrapped; } catch (e) {}
+    var baseOpen = window.openTask;
+    var open = function (id) {
+      var r = baseOpen.apply(this, arguments);
+      try {
+        var box = q('#rdpHistory'), t = tasks.find(function (x) { return x.id === id; });
+        if (box) {
+          box.hidden = !t; box.open = false;
+          var n = t && Array.isArray(t.history) ? t.history.length : 0;
+          box.querySelector('summary').textContent = 'Historique des modifications' + (n ? ' (' + n + ')' : '');
+          q('#rdpHistoryList').innerHTML = histHtml(t);
+        }
+      } catch (e) { console.warn(e); }
+      return r;
+    };
+    window.openTask = open;
+    try { openTask = open; } catch (e) {}
+    histReset();
+  }
+
   function setupPlanningExtras() {
     normalizeTasks();
     installCascade();
     try { cascadeDependencies(); } catch (e) {}
+    // Une seule échelle de temps : celle des lignes affichées (filtres compris),
+    // réutilisée par l'en-tête des semaines et par le glisser-déposer.
+    var baseBounds = window.bounds, lastB = null, rendering = false;
+    if (typeof baseBounds === 'function') {
+      var wb = function () { if (!rendering && lastB) return lastB; var r = baseBounds.apply(this, arguments); if (rendering) lastB = r; return r; };
+      window.bounds = wb;
+      try { bounds = wb; } catch (e) {}
+    }
     var base = window.renderGantt;
     if (typeof base === 'function') {
-      var wrapped = function () { var r = base.apply(this, arguments); postRender(); return r; };
+      var wrapped = function () { rendering = true; lastB = null; var r; try { r = base.apply(this, arguments); } finally { rendering = false; } postRender(); return r; };
       window.renderGantt = wrapped;
       try { renderGantt = wrapped; } catch (e) {}
     }
@@ -3343,6 +3452,7 @@ $('#exportDataBtn').onclick = async () => {
     setupDialog();
     setupBenches();
     setupSteps();
+    setupHistory();
     try { render(); } catch (e) {}
     try { if (typeof renderSpecs === 'function') renderSpecs(); } catch (e) {}
     var rt = null;
@@ -3461,6 +3571,7 @@ $('#exportDataBtn').onclick = async () => {
       if (typeof renderSpecs === 'function') renderSpecs();
       if (q('#benchView') && !q('#benchView').hidden) renderBenches();
     } finally { S.applying = false; }
+    if (window.rdpHistReset) window.rdpHistReset();
     st.base = data;
     st.eTag = meta.eTag;
     st.lastMod = { at: meta.lastModifiedDateTime, by: modByName(meta) };
