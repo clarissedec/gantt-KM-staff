@@ -3550,6 +3550,40 @@ $('#exportDataBtn').onclick = async () => {
     }, true);
   }
 
+
+  /* Charge affichée à côté des noms = charge de la semaine en cours (même calcul
+     que le graphique « Charge équipe »), pic des 4 semaines suivantes au survol. */
+  function setupLoad() {
+    if (typeof weeklyLoad !== 'function') return;
+    function monday0() { var d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - (d.getDay() + 6) % 7); return d; }
+    var lf = function (id) { return weeklyLoad(id, monday0()); };
+    window.loadFor = lf;
+    try { loadFor = lf; } catch (e) {}
+    var baseTeam = window.renderTeam;
+    var rt = function () {
+      var r = baseTeam.apply(this, arguments);
+      try {
+        var m0 = monday0();
+        document.querySelectorAll('#teamMini .mini-row').forEach(function (row) {
+          var name = row.querySelector('span') && row.querySelector('span').textContent;
+          var p = team.find(function (x) { return x.name === name; }), small = row.querySelector('small');
+          if (!p || !small) return;
+          var now = weeklyLoad(p.id, m0), peak = 0, peakW = null;
+          for (var i = 1; i <= 4; i++) { var w = addDays(m0, 7 * i), v = weeklyLoad(p.id, w); if (v > peak) { peak = v; peakW = w; } }
+          var cap = Number(p.capacity) || 100;
+          small.textContent = now + '%';
+          small.style.color = now > cap ? '#ff8a94' : '';
+          small.style.fontWeight = now > cap ? '800' : '';
+          row.title = p.name.trim() + ' : ' + now + ' % cette semaine' + (peakW ? ' · pic à ' + peak + ' % la semaine du ' + shortDate(isoOf(peakW)) + ' (4 prochaines semaines)' : '') + (now > cap ? ' · surcharge' : '');
+        });
+        var head = q('#teamMini .eyebrow'); if (head && head.textContent.indexOf('CETTE SEMAINE') < 0) head.textContent += ' · CHARGE CETTE SEMAINE';
+      } catch (e) { console.warn(e); }
+      return r;
+    };
+    window.renderTeam = rt;
+    try { renderTeam = rt; } catch (e) {}
+  }
+
   function setupPlanningExtras() {
     normalizeTasks();
     installCascade();
@@ -3574,6 +3608,7 @@ $('#exportDataBtn').onclick = async () => {
     setupSteps();
     setupHistory();
     setupDates();
+    setupLoad();
     try { render(); } catch (e) {}
     try { if (typeof renderSpecs === 'function') renderSpecs(); } catch (e) {}
     var rt = null;
