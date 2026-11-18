@@ -656,6 +656,10 @@ select.rdp-dep-native{display:none!important}
 #taskForm label.date-field.rdp-show:not([hidden]){display:grid!important}
 #taskForm .form-grid{align-items:start}
 #taskForm input[readonly]{background:#f3f5f8;color:#4c566a}
+.bar.task-common:after{content:"";position:absolute;left:0;right:0;bottom:0;height:4px;background:linear-gradient(90deg,#5277e8 0 25%,#18b98b 25% 50%,#e5a43b 50% 75%,#b45309 75%)}
+.leg.common{background:linear-gradient(90deg,#5277e8 0 25%,#18b98b 25% 50%,#e5a43b 50% 75%,#b45309 75%)}
+.rdp-common-tag{color:#fff;background:linear-gradient(90deg,#5277e8,#18b98b,#e5a43b,#b45309);border-radius:6px;padding:0 6px;font-weight:800;font-size:10px;line-height:16px}
+.type-badge.common{background:#e8f1ff;color:#1e3a8a}
 .bar.Industrialisation{background:#b45309}.leg.indus{background:#b45309}
 .bar.task-production{background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.28) 0 5px,transparent 5px 10px)!important}.leg.prod{background:repeating-linear-gradient(135deg,#8993a5 0 2px,#d5dae3 2px 4px)}.type-badge.production{background:#fdecdc;color:#9a4508}.production-tag{color:#9a4508;font-weight:700}
 #rdpSaveBtn:disabled{opacity:.45;cursor:default}
@@ -755,7 +759,7 @@ body.rdp-readonly .bar,body.rdp-readonly .milestone{cursor:default}
           </div>
           <div id="ganttBody"></div>
         </div>
-        <div class="legend"><span><i class="leg research"></i>Recherche</span><span><i class="leg prototype"></i>Prototype</span><span><i class="leg test"></i>Tests</span><span><i class="leg scale"></i>Échelle</span><span><i class="leg indus"></i>Industrialisation</span><span><i class="leg prod"></i>Production</span><span><i class="leg multidep"></i>Attend 2 tâches ou plus</span><span><i class="diamond"></i>Jalon TRL</span><span><i class="diamond keystep"></i>Étape clé</span></div>
+        <div class="legend"><span><i class="leg research"></i>Recherche</span><span><i class="leg prototype"></i>Prototype</span><span><i class="leg test"></i>Tests</span><span><i class="leg scale"></i>Échelle</span><span><i class="leg indus"></i>Industrialisation</span><span><i class="leg prod"></i>Production</span><span><i class="leg common"></i>Commune à tous</span><span><i class="leg multidep"></i>Attend 2 tâches ou plus</span><span><i class="diamond"></i>Jalon TRL</span><span><i class="diamond keystep"></i>Étape clé</span></div>
       </section>
 
       <section id="capacityView" hidden>
@@ -840,7 +844,7 @@ body.rdp-readonly .bar,body.rdp-readonly .milestone{cursor:default}
       <input type="hidden" id="taskId">
       <label>Nom de la tâche<input id="taskName" required></label>
       <div class="form-grid">
-        <label>Type<select id="taskType"><option value="research">Recherche</option><option value="development">Développement</option><option value="production">Production</option><option value="supply">Bloc supply</option><option value="decision">Jalon de décision</option></select></label>
+        <label>Type<select id="taskType"><option value="research">Recherche</option><option value="development">Développement</option><option value="production">Production</option><option value="common">Commune à tous</option><option value="supply">Bloc supply</option><option value="decision">Jalon de décision</option></select></label>
         <label class="decision-optional">Équipe<select id="taskTeam"><option>R&amp;D</option><option>Test</option><option>Mechanical Design</option><option>Industrialisation</option></select></label>
         <label class="decision-optional">Phase<select id="taskPhase"><option>Recherche</option><option>Prototype</option><option>Tests prototype</option><option>Tests à l'échelle</option><option>Supply</option><option>Industrialisation</option></select></label>
         <label class="decision-optional">Avancement (%)<input id="taskProgress" type="number" min="0" max="100" value="0"></label>
@@ -862,7 +866,7 @@ body.rdp-readonly .bar,body.rdp-readonly .milestone{cursor:default}
         <small class="field-help">Le jalon est validé lorsque toutes les lignes renseignées sont cochées.</small>
       </fieldset>
       <label class="check-row"><input id="taskMilestone" type="checkbox"> Jalon TRL</label>
-      <label id="rdpAnchorField" hidden>Placer ce jalon dans une tâche<select id="rdpAnchor"></select><small class="field-help">Le losange s’affiche sur la ligne de cette tâche et suit ses dates. Les tâches des autres équipes peuvent en dépendre.</small></label>
+      <label id="rdpAnchorField" hidden>Placer ce jalon dans une tâche<select id="rdpAnchor"></select><small class="field-help">Le losange s’affiche sur la ligne de cette tâche et suit ses dates. Les tâches des autres équipes peuvent en dépendre.</small></label><label id="rdpAnchorDateLabel" hidden>Date du jalon dans la tâche<input id="rdpAnchorDate" type="date"><small class="field-help" id="rdpAnchorDateHelp"></small></label>
       <label class="check-row" id="inlineField" hidden><input id="taskInline" type="checkbox"> Afficher le losange sur la ligne de la tâche qui en dépend</label>
       <label class="check-row" id="keyStepField" hidden><input id="taskKeyStep" type="checkbox"> Étape clé (tout doit être prêt, pas une décision)</label>
       <label id="hostField" hidden>Afficher sur la ligne de<select id="taskHost"><option value="">Sur sa propre ligne</option></select><small class="field-help">Le losange se place juste avant le début de cette tâche et la suit si elle bouge. Aucun lien avec la supply ni avec les dépendances.</small></label>
@@ -989,6 +993,7 @@ renderSettings = function () {
     if (task.type === 'research') badge.textContent = 'RECHERCHE';
     if (task.type === 'development') badge.textContent = 'DÉVELOPPEMENT';
     if (task.type === 'production') { badge.textContent = 'PRODUCTION'; badge.classList.add('production'); }
+    if (task.type === 'common') { badge.textContent = 'COMMUNE'; badge.classList.add('common'); }
     const group = document.createElement('span');
     group.className = 'type-badge';
     group.textContent = task.teamGroup;
@@ -2885,6 +2890,7 @@ $('#exportDataBtn').onclick = async () => {
       var t = tasks.find(function (x) { return x.id == cell.dataset.id; });
       var meta = cell.querySelector('.task-meta');
       if (!t || !meta) return;
+      if (t.type === 'common' && !meta.querySelector('.rdp-common-tag')) meta.insertAdjacentHTML('afterbegin', '<span class="rdp-common-tag" title="Tâche qui demande l’intervention de plusieurs équipes">Commune à tous</span>');
       if (t.type === 'production' && !meta.querySelector('.production-tag')) meta.insertAdjacentHTML('beforeend', '<span class="production-tag">Production</span>');
       var nDeps = allDeps(t).length, alertAt = Math.max(2, Number(C.MULTI_DEP_ALERT) || 2);
       if (nDeps >= alertAt) {
@@ -2936,6 +2942,10 @@ $('#exportDataBtn').onclick = async () => {
     var host = tasks.find(function (x) { return x.id == a.task; });
     if (!host || host.id == m.id) return '';
     if (a.step === 'end') return host.end;
+    if (a.step === 'date') {
+      var off = Math.max(0, Math.min(Number(a.offset) || 0, Math.max(0, (Number(host.durationDays) || 1) - 1)));
+      return datePlusDays(host.start, off);
+    }
     var cum = 0, list = stepsOf(host);
     for (var i = 0; i < list.length; i++) { cum += Number(list[i].days); if (list[i].id === a.step) return datePlusDays(host.start, cum - 1); }
     return '';
@@ -2944,6 +2954,7 @@ $('#exportDataBtn').onclick = async () => {
     var a = m.anchor, host = a && tasks.find(function (x) { return x.id == a.task; });
     if (!host) return '';
     if (a.step === 'end') return 'fin de « ' + host.name + ' »';
+    if (a.step === 'date') return 'le ' + shortDate(anchorDate(m)) + ' dans « ' + host.name + ' »';
     var st0 = stepsOf(host).find(function (x) { return x.id === a.step; });
     return 'fin de l’étape « ' + (st0 ? st0.name : '?') + ' » de « ' + host.name + ' »';
   }
@@ -2971,7 +2982,9 @@ $('#exportDataBtn').onclick = async () => {
       var hostTl = hostBar && hostBar.closest('.timeline-row');
       if (!hostTl || !host) return;
       var frac = 1;
-      if (m.anchor.step !== 'end') {
+      if (m.anchor.step === 'date') {
+        frac = Math.min(1, (Math.round((parse(anchorDate(m)) - parse(host.start)) / DAY) + 1) / Math.max(1, Number(host.durationDays) || 1));
+      } else if (m.anchor.step !== 'end') {
         var cum = 0, tot = stepsTotal(host);
         stepsOf(host).some(function (x) { cum += Number(x.days); return x.id === m.anchor.step; });
         if (tot) frac = cum / tot;
@@ -3019,13 +3032,26 @@ $('#exportDataBtn').onclick = async () => {
       if (anchorField) anchorField.hidden = !isMs;
       var dl = q('#taskDependency') && q('#taskDependency').closest('label');
       if (dl && isMs && !(q('#taskKeyStep') && q('#taskKeyStep').checked)) dl.hidden = !!(anchorSel && anchorSel.value);
+      var adl = q('#rdpAnchorDateLabel'), adi = q('#rdpAnchorDate');
+      if (adl && adi && anchorSel) {
+        var v = anchorSel.value, isDate = /\|date$/.test(v);
+        adl.hidden = !isMs || !isDate;
+        if (isDate) {
+          var host = tasks.find(function (x) { return String(x.id) === v.split('|')[0]; });
+          if (host) {
+            adi.min = host.start; adi.max = host.end;
+            if (!adi.value || adi.value < host.start || adi.value > host.end) adi.value = host.end;
+            q('#rdpAnchorDateHelp').textContent = 'Entre le ' + shortDate(host.start) + ' et le ' + shortDate(host.end) + '. Le jalon suivra la tâche si elle se décale.';
+          }
+        }
+      }
     }
     function fillAnchor(sel) {
       if (!anchorSel) return;
       var html = '<option value="">Non, date calculée par ses dépendances</option>';
       tasks.filter(function (t) { return !t.milestone && (!current || t.id !== current.id); }).sort(function (a, b) { return a.start < b.start ? -1 : 1; }).forEach(function (t) {
         var list = stepsOf(t);
-        html += '<optgroup label="' + esc(t.name) + '">' + list.map(function (x) { return '<option value="' + t.id + '|' + esc(x.id) + '">Fin de l’étape « ' + esc(x.name) + ' »</option>'; }).join('') + '<option value="' + t.id + '|end">Fin de la tâche</option></optgroup>';
+        html += '<optgroup label="' + esc(t.name) + '">' + list.map(function (x) { return '<option value="' + t.id + '|' + esc(x.id) + '">Fin de l’étape « ' + esc(x.name) + ' »</option>'; }).join('') + '<option value="' + t.id + '|end">Fin de la tâche</option><option value="' + t.id + '|date">À une date précise dans la tâche…</option></optgroup>';
       });
       anchorSel.innerHTML = html;
       anchorSel.value = sel || '';
@@ -3034,6 +3060,7 @@ $('#exportDataBtn').onclick = async () => {
     rows.addEventListener('click', function (e) { var b = e.target.closest('.rdp-s-del'); if (b) { b.closest('.rdp-step-row').remove(); sync(); } });
     addBtn.onclick = function () { rows.insertAdjacentHTML('beforeend', rowHtml({ id: 's' + Date.now(), name: '', days: 5 })); rows.lastElementChild.querySelector('.rdp-s-name').focus(); sync(); };
     if (anchorSel) anchorSel.addEventListener('change', sync);
+    if (q('#rdpAnchorDate')) q('#rdpAnchorDate').addEventListener('change', sync);
     q('#taskType').addEventListener('change', sync);
     if (q('#taskMilestone')) q('#taskMilestone').addEventListener('change', sync);
     if (q('#taskKeyStep')) q('#taskKeyStep').addEventListener('change', sync);
@@ -3045,6 +3072,7 @@ $('#exportDataBtn').onclick = async () => {
         current = tasks.find(function (x) { return x.id === id; }) || null;
         rows.innerHTML = stepsOf(current).map(rowHtml).join('');
         fillAnchor(current && current.anchor ? current.anchor.task + '|' + current.anchor.step : '');
+        var adi0 = q('#rdpAnchorDate'); if (adi0) adi0.value = current && current.anchor && current.anchor.step === 'date' ? anchorDate(current) : '';
         if (dur) dur.readOnly = false;
         sync();
         if (current && current.anchor) { var hs = q('#hostField'); if (hs) hs.hidden = true; }
@@ -3055,7 +3083,7 @@ $('#exportDataBtn').onclick = async () => {
     try { openTask = open; } catch (e) {}
 
     q('#taskForm').addEventListener('submit', function () {
-      var list = read(), av = anchorSel ? anchorSel.value : '';
+      var list = read(), av = anchorSel ? anchorSel.value : '', adv = q('#rdpAnchorDate') ? q('#rdpAnchorDate').value : '';
       var isMs = q('#taskType').value === 'decision' || (q('#taskMilestone') && q('#taskMilestone').checked);
       var editedId = +q('#taskId').value, editedName = q('#taskName').value;
       setTimeout(function () {
@@ -3066,11 +3094,15 @@ $('#exportDataBtn').onclick = async () => {
         if (isMs && av) {
           var parts = av.split('|');
           t.anchor = { task: Number(parts[0]), step: parts[1] };
+          if (parts[1] === 'date') {
+            var hst = tasks.find(function (x) { return x.id == parts[0]; });
+            t.anchor.offset = hst && adv ? Math.max(0, Math.round((parse(adv) - parse(hst.start)) / DAY)) : 0;
+          }
           t.dep = ''; t.extraDeps = []; delete t.hostId; delete t.inline;
         } else delete t.anchor;
         // une étape supprimée détache les jalons qui y étaient placés
         tasks.forEach(function (m) {
-          if (m.anchor && m.anchor.task == t.id && m.anchor.step !== 'end' && !stepsOf(t).some(function (x) { return x.id === m.anchor.step; })) m.anchor.step = 'end';
+          if (m.anchor && m.anchor.task == t.id && m.anchor.step !== 'end' && m.anchor.step !== 'date' && !stepsOf(t).some(function (x) { return x.id === m.anchor.step; })) m.anchor.step = 'end';
         });
         tasks.forEach(function (m) { if (m.anchor && !exists(m.anchor.task)) delete m.anchor; });
         cascadeDependencies();
@@ -3347,7 +3379,7 @@ $('#exportDataBtn').onclick = async () => {
      Les changements d'un même utilisateur dans les 10 s sont regroupés.
      ===================================================================== */
   var HIST_LABELS = { name: 'Nom', start: 'Début', end: 'Fin', durationDays: 'Durée', progress: 'Avancement', people: 'Personnes', teamGroup: 'Équipe', phase: 'Phase', type: 'Type', deps: 'Dépend de', items: 'Items', benches: 'Paillasses', steps: 'Étapes', anchor: 'Placé dans', checklist: 'Checklist' };
-  var TYPE_LABELS = { research: 'Recherche', development: 'Développement', production: 'Production', supply: 'Bloc supply', decision: 'Jalon de décision' };
+  var TYPE_LABELS = { research: 'Recherche', development: 'Développement', production: 'Production', common: 'Commune à tous', supply: 'Bloc supply', decision: 'Jalon de décision' };
   var histSnap = null, histReady = false;
   function d8(s) { if (!s) return ''; var d = parse(s); return pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1) + '/' + d.getFullYear(); }
   function taskName(id) { var t = tasks.find(function (x) { return x.id == id; }); return t ? t.name : ''; }
@@ -3454,6 +3486,7 @@ $('#exportDataBtn').onclick = async () => {
       var anc = q('#rdpAnchor') && q('#rdpAnchor').value;
       if (isMs() && anc) {
         var parts = anc.split('|'); var fake = { id: -1, anchor: { task: Number(parts[0]), step: parts[1] } };
+        if (parts[1] === 'date') { var h0 = tasks.find(function (x) { return x.id == parts[0]; }), av0 = q('#rdpAnchorDate') && q('#rdpAnchorDate').value; fake.anchor.offset = h0 && av0 ? Math.round((parse(av0) - parse(h0.start)) / DAY) : 0; }
         return { date: anchorDate(fake), why: 'Calculée : ' + anchorLabel(fake) };
       }
       var ids = chosenDeps(); if (!ids.length) return null;
@@ -3482,7 +3515,7 @@ $('#exportDataBtn').onclick = async () => {
       dIn.value = days(sIn.value, eIn.value);
       refresh();
     });
-    ['#taskType', '#taskMilestone', '#rdpAnchor', '#taskDependency'].forEach(function (k) { var el = q(k); if (el) el.addEventListener('change', function () { setTimeout(refresh, 0); }); });
+    ['#taskType', '#taskMilestone', '#rdpAnchor', '#rdpAnchorDate', '#taskDependency'].forEach(function (k) { var el = q(k); if (el) el.addEventListener('change', function () { setTimeout(refresh, 0); }); });
     var rows = q('#rdpStepRows'); if (rows) rows.addEventListener('input', function () { setTimeout(refresh, 0); });
 
     var baseOpen = window.openTask;
