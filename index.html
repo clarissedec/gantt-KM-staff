@@ -660,6 +660,7 @@ select.rdp-dep-native{display:none!important}
 .leg.common{background:linear-gradient(90deg,#5277e8 0 25%,#18b98b 25% 50%,#e5a43b 50% 75%,#b45309 75%)}
 .rdp-common-tag{color:#fff;background:linear-gradient(90deg,#5277e8,#18b98b,#e5a43b,#b45309);border-radius:6px;padding:0 6px;font-weight:800;font-size:10px;line-height:16px}
 .type-badge.common{background:#e8f1ff;color:#1e3a8a}
+#ganttBody.rdp-period .timeline-row{overflow:hidden}
 .bar.Industrialisation{background:#b45309}.leg.indus{background:#b45309}
 .bar.task-production{background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.28) 0 5px,transparent 5px 10px)!important}.leg.prod{background:repeating-linear-gradient(135deg,#8993a5 0 2px,#d5dae3 2px 4px)}.type-badge.production{background:#fdecdc;color:#9a4508}.production-tag{color:#9a4508;font-weight:700}
 #rdpSaveBtn:disabled{opacity:.45;cursor:default}
@@ -749,7 +750,7 @@ body.rdp-readonly .bar,body.rdp-readonly .milestone{cursor:default}
             <option value="all">Toutes les phases</option>
             <option>Recherche</option><option>Prototype</option><option>Tests prototype</option><option>Tests à l'échelle</option><option>Supply</option><option>Industrialisation</option>
           </select>
-          <select id="itemFilter" aria-label="Filtrer par item"><option value="all">Tous les items</option></select><label class="toggle rdp-toggle"><input type="checkbox" id="hideDone"><span></span>Masquer les tâches terminées</label><label class="toggle rdp-toggle"><input type="checkbox" id="blockView"><span></span>Vue par blocs</label><input type="checkbox" id="baselineToggle" hidden>
+          <select id="periodFilter" aria-label="Période affichée"><option value="all">Tout le planning</option><option value="week2">2 semaines</option><option value="month">Mois en cours</option><option value="next">Mois prochain</option><option value="3m">3 prochains mois</option></select><select id="sortOrder" aria-label="Ordre des tâches"><option value="manual">Ordre manuel</option><option value="date">Tri par date</option></select><select id="itemFilter" aria-label="Filtrer par item"><option value="all">Tous les items</option></select><label class="toggle rdp-toggle"><input type="checkbox" id="hideDone"><span></span>Masquer les tâches terminées</label><label class="toggle rdp-toggle"><input type="checkbox" id="blockView"><span></span>Vue par blocs</label><input type="checkbox" id="baselineToggle" hidden>
         </div>
 
         <div class="gantt-card">
@@ -2720,7 +2721,17 @@ $('#exportDataBtn').onclick = async () => {
 
   function itemList() { try { if (Array.isArray(config.items) && config.items.length) return config.items; } catch (e) {} return ITEMS_DEFAULT; }
   function itemColor(name) { var i = itemList().indexOf(name); return ITEM_COLORS[(i < 0 ? 0 : i) % ITEM_COLORS.length]; }
-  function viewPrefs() { var v = readJSON(VIEW_KEY, {}); return { hideDone: !!v.hideDone, blocks: !!v.blocks, item: v.item || 'all' }; }
+  function viewPrefs() { var v = readJSON(VIEW_KEY, {}); return { hideDone: !!v.hideDone, blocks: !!v.blocks, item: v.item || 'all', sort: v.sort === 'date' ? 'date' : 'manual', period: v.period || 'all' }; }
+  // Période affichée : null = tout le planning, sinon {min, max (exclu)}.
+  function periodRange(p) {
+    var n = new Date(); n.setHours(0, 0, 0, 0);
+    var y = n.getFullYear(), m = n.getMonth();
+    if (p === 'month') return { min: new Date(y, m, 1), max: new Date(y, m + 1, 1) };
+    if (p === 'next') return { min: new Date(y, m + 1, 1), max: new Date(y, m + 2, 1) };
+    if (p === '3m') return { min: new Date(y, m, 1), max: new Date(y, m + 3, 1) };
+    if (p === 'week2') { var mo = new Date(n); mo.setDate(mo.getDate() - (mo.getDay() + 6) % 7); var e = new Date(mo); e.setDate(e.getDate() + 14); return { min: mo, max: e }; }
+    return null;
+  }
   function setView(patch) { writeKey(VIEW_KEY, Object.assign(viewPrefs(), patch)); }
   function pad2(n) { return String(n).padStart(2, '0'); }
   function isoOf(d) { return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
@@ -2821,11 +2832,15 @@ $('#exportDataBtn').onclick = async () => {
       if (v.hideDone && Number(t.progress) >= 100) return false;
       var items = Array.isArray(t.items) ? t.items : [];
       if (v.item === 'none') return !items.length;
-      if (v.item !== 'all') return items.indexOf(v.item) >= 0;
+      if (v.item !== 'all' && items.indexOf(v.item) < 0) return false;
+      var pr = periodRange(v.period);
+      if (pr && (parse(t.end) < pr.min || parse(t.start) >= pr.max)) return false;
       return true;
     });
     blockInfo = {};
-    return v.blocks ? blockOrder(out, all || list) : out;
+    if (v.blocks) return blockOrder(out, all || list);
+    if (v.sort === 'date') out = out.slice().sort(function (a, b) { return a.start < b.start ? -1 : a.start > b.start ? 1 : a.end < b.end ? -1 : a.end > b.end ? 1 : (a.order || 0) - (b.order || 0); });
+    return out;
   };
 
   // Frise lisible : mois + semaines (numéro et lundi) + sprints + aujourd'hui.
@@ -2835,6 +2850,12 @@ $('#exportDataBtn').onclick = async () => {
     var b = bounds();
     var week = zoom === 'week';
     var tl = week ? Math.max(780, Math.round(b.total / 7 * 54)) : 780;
+    var per = viewPrefs().period !== 'all';
+    if (per) {
+      var avail = card.clientWidth - (q('.task-head') ? q('.task-head').offsetWidth : 360) - 4;
+      tl = Math.max(tl, avail, Math.round(b.total * 26));
+    }
+    body.classList.toggle('rdp-period', per);
     card.style.setProperty('--rdp-tl', tl + 'px');
     var startD = new Date(b.min), endD = new Date(b.max), html = '';
     var m = new Date(startD.getFullYear(), startD.getMonth(), 1), months = [];
@@ -2910,6 +2931,7 @@ $('#exportDataBtn').onclick = async () => {
       if (!t) return;
       el.title = (t.milestone ? 'Le ' + longDate(t.start) : 'Du ' + longDate(t.start) + ' au ' + longDate(t.end) + ' (' + t.durationDays + ' j)') + (st.canWrite ? ' · glisser pour déplacer' : '');
     });
+    if (v.sort === 'date' && !v.blocks) document.querySelectorAll('#ganttBody .gantt-row').forEach(function (row) { row.draggable = false; var h = row.querySelector('.drag-handle'); if (h) h.remove(); });
     if (!v.blocks) return;
     var shown = {};
     document.querySelectorAll('#ganttBody .gantt-row').forEach(function (row) {
@@ -3135,6 +3157,8 @@ $('#exportDataBtn').onclick = async () => {
       if (sel.value !== viewPrefs().item) sel.value = 'all';
       sel.onchange = function () { setView({ item: sel.value }); renderGantt(); };
     }
+    var so = q('#sortOrder'); if (so) { so.value = viewPrefs().sort; so.onchange = function () { setView({ sort: so.value }); renderGantt(); }; }
+    var pe = q('#periodFilter'); if (pe) { pe.value = viewPrefs().period; if (pe.value !== viewPrefs().period) pe.value = 'all'; pe.onchange = function () { setView({ period: pe.value }); renderGantt(); setTimeout(scrollToToday, 30); }; }
     var hd = q('#hideDone'); if (hd) { hd.checked = viewPrefs().hideDone; hd.onchange = function () { setView({ hideDone: hd.checked }); renderGantt(); }; }
     var bv = q('#blockView'); if (bv) { bv.checked = viewPrefs().blocks; bv.onchange = function () { setView({ blocks: bv.checked }); renderGantt(); }; }
     var si = q('#searchInput'); if (si) si.oninput = function () { renderGantt(); };
@@ -3592,7 +3616,14 @@ $('#exportDataBtn').onclick = async () => {
     // réutilisée par l'en-tête des semaines et par le glisser-déposer.
     var baseBounds = window.bounds, lastB = null, rendering = false;
     if (typeof baseBounds === 'function') {
-      var wb = function () { if (!rendering && lastB) return lastB; var r = baseBounds.apply(this, arguments); if (rendering) lastB = r; return r; };
+      var wb = function () {
+        if (!rendering && lastB) return lastB;
+        var pr = periodRange(viewPrefs().period), r;
+        if (pr) r = { min: pr.min, max: pr.max, total: Math.max(1, Math.round((pr.max - pr.min) / DAY)) };
+        else r = baseBounds.apply(this, arguments);
+        if (rendering) lastB = r;
+        return r;
+      };
       window.bounds = wb;
       try { bounds = wb; } catch (e) {}
     }
